@@ -40,9 +40,20 @@
       closable class="mb-4" @click:close="loadError = ''"
     >{{ loadError }}</v-alert>
 
-    <!-- Loading -->
-    <div v-if="isLoading && !songs.length" class="d-flex justify-center py-12">
-      <v-progress-circular indeterminate color="primary" size="40" />
+    <!-- Loading skeletons (first load only) -->
+    <div v-if="isLoading && !songs.length">
+      <div class="section-label mb-3">Saved Songs</div>
+      <v-row class="mb-4">
+        <v-col v-for="i in 4" :key="i" cols="12" md="6">
+          <v-skeleton-loader type="card" />
+        </v-col>
+      </v-row>
+      <div class="section-label mt-4 mb-3">Practice Stats</div>
+      <v-row>
+        <v-col v-for="i in 4" :key="i" cols="6" sm="3">
+          <v-skeleton-loader type="heading,text" class="pa-3" style="min-height: 80px" />
+        </v-col>
+      </v-row>
     </div>
 
     <template v-if="!isLoading || songs.length">
@@ -205,6 +216,12 @@
                       prepend-icon="mdi-music-note-plus"
                       @click.stop="router.push('/gig')"
                     >Open in Gig</v-btn>
+                    <v-btn
+                      size="small" variant="tonal" color="primary"
+                      prepend-icon="mdi-piano"
+                      :disabled="!song.chord_chart?.length"
+                      @click.stop="openInPlay(song)"
+                    >Open in Play</v-btn>
                     <v-btn
                       size="small" variant="flat" color="primary"
                       prepend-icon="mdi-play-circle-outline"
@@ -925,6 +942,23 @@ function scoreBadgeLabel(score) {
   if (score === 100) return 'Got it'
   if (score === 60)  return 'Almost'
   return 'Missed'
+}
+
+// ─── Open in Play ─────────────────────────────────────────────────────────────
+
+function openInPlay(song) {
+  if (!Array.isArray(song.chord_chart) || !song.chord_chart.length) return
+  const { root, type } = parseKey(song.key ?? '')
+  router.push({
+    path: '/play',
+    state: {
+      _cadenceLoad: true,
+      chords:  song.chord_chart,
+      key:     root ?? 'C',
+      keyType: type,
+      bpm:     song.bpm ?? 80,
+    },
+  })
 }
 
 // ─── Single-song drill ────────────────────────────────────────────────────────

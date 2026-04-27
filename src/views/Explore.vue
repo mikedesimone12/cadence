@@ -124,13 +124,25 @@
             </div>
           </div>
 
+          <v-alert
+            v-if="chordLimitWarning"
+            type="warning" variant="tonal" density="compact" closable class="mt-2"
+            @click:close="chordLimitWarning = false"
+          >7 chords max — remove one to add another.</v-alert>
+
           <div class="d-flex align-center justify-space-between mt-2">
             <span class="text-caption text-medium-emphasis">
               <v-icon size="12" class="mr-1">mdi-drag-horizontal-variant</v-icon>Drag to reorder
             </span>
-            <div class="d-flex align-center gap-2">
+            <div class="d-flex align-center" style="gap: 4px">
               <span :class="countColor" class="text-caption">{{ selectedChordsSharp.length }}/7</span>
-              <v-btn variant="text" size="x-small" color="error" class="ml-2" @click="reset">
+              <v-btn
+                v-if="currentUser"
+                variant="text" size="x-small" color="primary"
+                prepend-icon="mdi-content-save-outline"
+                @click="openSaveDialog"
+              >Save</v-btn>
+              <v-btn variant="text" size="x-small" color="error" @click="reset">
                 Clear all
               </v-btn>
             </div>
@@ -252,14 +264,23 @@
                 Hover a chord for substitution ideas
               </div>
 
-              <!-- Load all chords from this key into the progression -->
-              <v-btn
-                variant="text" size="x-small" color="secondary" class="mt-2 ml-n2"
-                @click="loadKey(pair.majorRoot)"
-              >
-                <v-icon start size="12">mdi-music-note-plus</v-icon>
-                Explore {{ toDisplayNote(pair.majorRoot) }} major
-              </v-btn>
+              <!-- Load all chords from this key / send to Play -->
+              <div class="d-flex flex-wrap align-center mt-2" style="gap: 4px">
+                <v-btn
+                  variant="text" size="x-small" color="secondary" class="ml-n2"
+                  @click="loadKey(pair.majorRoot)"
+                >
+                  <v-icon start size="12">mdi-music-note-plus</v-icon>
+                  Explore {{ toDisplayNote(pair.majorRoot) }} major
+                </v-btn>
+                <v-btn
+                  variant="tonal" size="x-small" color="primary"
+                  @click="sendToPlay(pair.majorRoot)"
+                >
+                  <v-icon start size="12">mdi-piano</v-icon>
+                  Send to Play
+                </v-btn>
+              </div>
 
             </v-card-text>
           </v-card>
@@ -339,6 +360,50 @@
       </div>
     </v-expand-transition>
 
+    <!-- ── Save Progression dialog ──────────────────────────────────────────── -->
+    <v-dialog v-model="saveDialogOpen" max-width="380" :persistent="savingProg">
+      <v-card>
+        <v-card-title class="pt-5 pb-0 px-5" style="font-family: 'Space Grotesk', sans-serif">
+          Save Progression
+        </v-card-title>
+        <v-card-text class="px-5 pt-3">
+          <v-text-field
+            v-model="saveForm.title"
+            label="Title *"
+            variant="outlined" density="compact" hide-details
+            class="mb-3" autofocus
+          />
+          <v-text-field
+            v-model="saveForm.artist"
+            label="Artist"
+            variant="outlined" density="compact" hide-details
+            class="mb-3"
+          />
+          <v-text-field
+            v-model.number="saveForm.bpm"
+            label="BPM"
+            type="number" min="40" max="300"
+            variant="outlined" density="compact" hide-details
+          />
+          <v-alert
+            v-if="saveError"
+            type="error" variant="tonal" density="compact" closable class="mt-3"
+            @click:close="saveError = ''"
+          >{{ saveError }}</v-alert>
+        </v-card-text>
+        <v-card-actions class="px-5 pb-4 pt-0">
+          <v-spacer />
+          <v-btn variant="text" size="small" color="secondary" @click="saveDialogOpen = false">Cancel</v-btn>
+          <v-btn
+            color="primary" variant="flat" size="small"
+            :loading="savingProg"
+            :disabled="!saveForm.title.trim()"
+            @click="saveProgression"
+          >Save</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- ── Reference: simplify complex chords ────────────────────────────── -->
     <v-expansion-panels variant="accordion" class="mt-4">
       <v-expansion-panel>
@@ -361,8 +426,11 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { musicalKeys, noteToSharp, checkKeys, chordToNNS } from '@/core/musicTheory.js'
 import { useAudio } from '../composables/useAudio'
+import { useAuth } from '../composables/useAuth'
+import { supabase } from '../lib/supabase'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -385,6 +453,61 @@ const explanationText      = ref('')
 const explanationError     = ref('')
 const dragSrcIndex         = ref(null)
 const dragOverIndex        = ref(null)
+const chordLimitWarning    = ref(false)
+
+// ─── Router / auth ────────────────────────────────────────────────────────────
+
+const router = useRouter()
+const { currentUser } = useAuth()
+
+// ─── Save progression dialog ──────────────────────────────────────────────────
+
+const saveDialogOpen = ref(false)
+const savingProg     = ref(false)
+const saveError      = ref('')
+const saveForm       = ref({ title: '', artist: '', bpm: 80 })
+
+function openSaveDialog() {
+  saveForm.value = { title: '', artist: '', bpm: 80 }
+  saveError.value = ''
+  saveDialogOpen.value = true
+}
+
+async function saveProgression() {
+  if (!saveForm.value.title.trim()) return
+  savingProg.value = true
+  saveError.value = ''
+  try {
+    const key = keyPairs.value[0]?.majorRoot ?? null
+    const { error } = await supabase.from('songs').insert({
+      user_id:     currentUser.value.id,
+      title:       saveForm.value.title.trim(),
+      artist:      saveForm.value.artist.trim() || null,
+      bpm:         saveForm.value.bpm            || null,
+      key,
+      chord_chart: selectedChordsSharp.value,
+    })
+    if (error) throw error
+    saveDialogOpen.value = false
+  } catch (e) {
+    saveError.value = e.message
+  } finally {
+    savingProg.value = false
+  }
+}
+
+function sendToPlay(majorRoot) {
+  router.push({
+    path: '/play',
+    state: {
+      _cadenceLoad: true,
+      chords:  selectedChordsSharp.value,
+      key:     majorRoot,
+      keyType: 'major',
+      bpm:     80,
+    },
+  })
+}
 
 // ─── Audio engine ──────────────────────────────────────────────────────────────
 
@@ -446,7 +569,7 @@ function handleChordClick(chordSharp) {
     selectedChordsSharp.value.splice(idx, 1)
   } else {
     if (selectedChordsSharp.value.length >= 7) {
-      alert('A key only has 7 chords — remove one before adding another.')
+      chordLimitWarning.value = true
       return
     }
     selectedChordsSharp.value.push(chordSharp)
@@ -462,6 +585,7 @@ function reset() {
   explanationText.value     = ''
   explanationError.value    = ''
   showAllKeys.value         = false
+  chordLimitWarning.value   = false
 }
 function loadKey(majorRoot) {
   selectedChordsSharp.value = [...musicalKeys[majorRoot]]

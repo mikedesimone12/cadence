@@ -68,8 +68,8 @@
           </v-card>
         </v-expand-transition>
 
-        <div v-if="loadingSetlists" class="d-flex justify-center py-8">
-          <v-progress-circular indeterminate color="primary" size="32" />
+        <div v-if="loadingSetlists">
+          <v-skeleton-loader v-for="i in 3" :key="i" type="list-item-two-line" class="mb-2 rounded-lg" />
         </div>
 
         <template v-else-if="setlists.length">
@@ -137,8 +137,8 @@
             </v-btn>
           </div>
 
-          <div v-if="loadingSongs" class="d-flex justify-center py-10">
-            <v-progress-circular indeterminate color="primary" size="36" />
+          <div v-if="loadingSongs">
+            <v-skeleton-loader v-for="i in 3" :key="i" type="article" class="mb-2" />
           </div>
 
           <template v-else-if="songs.length">
@@ -241,6 +241,14 @@
                       </v-expand-transition>
                     </div>
                     <div class="d-flex" style="flex-shrink: 0; gap: 2px">
+                      <v-btn
+                        v-if="parsedChords(song).length"
+                        icon size="x-small" variant="text" color="primary"
+                        title="Open in Play"
+                        @click.stop="openInPlay(song)"
+                      >
+                        <v-icon size="14">mdi-piano</v-icon>
+                      </v-btn>
                       <v-btn icon size="x-small" variant="text" color="secondary" @click="openEditSong(song)">
                         <v-icon size="14">mdi-pencil</v-icon>
                       </v-btn>
@@ -608,6 +616,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onActivated } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { supabase } from '../lib/supabase'
 import { progressionToNNS, noteToSharp, musicalKeys, transposeProgression, getCapoSuggestion } from '../core/musicTheory'
@@ -615,6 +624,7 @@ import { useAudio } from '../composables/useAudio'
 import AuthModal from '../components/AuthModal.vue'
 
 const { currentUser } = useAuth()
+const router   = useRouter()
 const authOpen = ref(false)
 
 const { playChord: audioPlayChord, isLoaded: audioIsLoaded, ensureContext } = useAudio()
@@ -1044,6 +1054,23 @@ async function copyTransposed(song) {
   try {
     await navigator.clipboard.writeText(chords.join(', '))
   } catch { /* clipboard unavailable */ }
+}
+
+// ── Open in Play ──────────────────────────────────────────────────────────────
+
+function openInPlay(song) {
+  if (!Array.isArray(song.chord_chart) || !song.chord_chart.length) return
+  const { root, type } = parseKey(song.key ?? '')
+  router.push({
+    path: '/play',
+    state: {
+      _cadenceLoad: true,
+      chords:  song.chord_chart,
+      key:     root ?? 'C',
+      keyType: type,
+      bpm:     song.bpm ?? 80,
+    },
+  })
 }
 
 // ── Drill mode ────────────────────────────────────────────────────────────────

@@ -170,39 +170,47 @@
           </div>
         </div>
 
-        <!-- Load from song (logged-in only) -->
+        <!-- Load from song / Save (logged-in only) -->
         <div
           v-if="currentUser"
           class="mt-2"
           :style="progression.length ? 'border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px' : ''"
         >
-          <v-menu v-model="songMenuOpen" :close-on-content-click="false" max-height="320">
-            <template #activator="{ props }">
-              <v-btn
-                v-bind="props"
-                variant="text" size="x-small" color="secondary"
-                prepend-icon="mdi-playlist-music-outline"
-                :loading="loadingSongs"
-                @click="fetchUserSongs"
-              >Load from song</v-btn>
-            </template>
-            <v-list density="compact" min-width="240">
-              <v-list-item v-if="!userSongs.length && !loadingSongs" disabled>
-                <v-list-item-title class="text-caption text-medium-emphasis">
-                  No songs with chord charts
-                </v-list-item-title>
-              </v-list-item>
-              <v-list-item
-                v-for="song in userSongs" :key="song.id"
-                @click="loadFromSong(song); songMenuOpen = false"
-              >
-                <v-list-item-title class="text-body-2">{{ song.title }}</v-list-item-title>
-                <v-list-item-subtitle v-if="song.artist" class="text-caption">
-                  {{ song.artist }}
-                </v-list-item-subtitle>
-              </v-list-item>
-            </v-list>
-          </v-menu>
+          <div class="d-flex align-center flex-wrap" style="gap: 6px">
+            <v-menu v-model="songMenuOpen" :close-on-content-click="false" max-height="320">
+              <template #activator="{ props }">
+                <v-btn
+                  v-bind="props"
+                  variant="text" size="x-small" color="secondary"
+                  prepend-icon="mdi-playlist-music-outline"
+                  :loading="loadingSongs"
+                  @click="fetchUserSongs"
+                >Load from song</v-btn>
+              </template>
+              <v-list density="compact" min-width="240">
+                <v-list-item v-if="!userSongs.length && !loadingSongs" disabled>
+                  <v-list-item-title class="text-caption text-medium-emphasis">
+                    No songs with chord charts
+                  </v-list-item-title>
+                </v-list-item>
+                <v-list-item
+                  v-for="song in userSongs" :key="song.id"
+                  @click="loadFromSong(song); songMenuOpen = false"
+                >
+                  <v-list-item-title class="text-body-2">{{ song.title }}</v-list-item-title>
+                  <v-list-item-subtitle v-if="song.artist" class="text-caption">
+                    {{ song.artist }}
+                  </v-list-item-subtitle>
+                </v-list-item>
+              </v-list>
+            </v-menu>
+            <v-btn
+              v-if="progression.length"
+              variant="text" size="x-small" color="primary"
+              prepend-icon="mdi-content-save-outline"
+              @click="openSaveDialog"
+            >Save progression</v-btn>
+          </div>
         </div>
 
       </v-card-text>
@@ -297,15 +305,58 @@
     </div>
 
   </v-container>
+
+  <!-- Save Progression dialog -->
+  <v-dialog v-model="saveDialogOpen" max-width="380" :persistent="savingProg">
+    <v-card>
+      <v-card-title class="pt-5 pb-0 px-5" style="font-family: 'Space Grotesk', sans-serif">
+        Save Progression
+      </v-card-title>
+      <v-card-text class="px-5 pt-3">
+        <v-text-field
+          v-model="saveForm.title"
+          label="Title *"
+          variant="outlined" density="compact" hide-details
+          class="mb-3" autofocus
+        />
+        <v-text-field
+          v-model="saveForm.artist"
+          label="Artist"
+          variant="outlined" density="compact" hide-details
+          class="mb-3"
+        />
+        <v-alert
+          v-if="saveError"
+          type="error" variant="tonal" density="compact" closable class="mt-1"
+          @click:close="saveError = ''"
+        >{{ saveError }}</v-alert>
+      </v-card-text>
+      <v-card-actions class="px-5 pb-4 pt-0">
+        <v-spacer />
+        <v-btn variant="text" size="small" color="secondary" @click="saveDialogOpen = false">Cancel</v-btn>
+        <v-btn
+          color="primary" variant="flat" size="small"
+          :loading="savingProg"
+          :disabled="!saveForm.title.trim()"
+          @click="saveProgression"
+        >Save</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onActivated, onBeforeUnmount, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import * as Tone from 'tone'
 import { musicalKeys, noteToSharp, getCapoSuggestion, chordToNNS } from '@/core/musicTheory.js'
 import { useAudio } from '../composables/useAudio'
 import { useAuth } from '../composables/useAuth'
 import { supabase } from '../lib/supabase'
+
+// ─── Router ──────────────────────────────────────────────────────────────────
+
+const router = useRouter()
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -377,7 +428,14 @@ const {
   volume, setVolume,
 } = useAudio()
 
-onMounted(() => { if (isAudible.value) loadInstruments() })
+onMounted(() => {
+  if (isAudible.value) loadInstruments()
+  applyHistoryState()
+})
+onActivated(() => {
+  if (isAudible.value && !isLoaded.value) loadInstruments()
+  applyHistoryState()
+})
 watch(isAudible, v => { if (v && !isLoaded.value) loadInstruments() })
 
 // Keep Transport BPM in sync with slider
@@ -519,6 +577,61 @@ function loadFromSong(song) {
   if (isPlaying.value) stopPlayback()
   progression.value = [...song.chord_chart]
   if (song.bpm) bpm.value = Math.min(200, Math.max(40, song.bpm))
+}
+
+// ─── Load from router navigation state ───────────────────────────────────────
+
+function applyHistoryState() {
+  const s = window.history.state
+  if (!s?._cadenceLoad) return
+  if (isPlaying.value) stopPlayback()
+  if (Array.isArray(s.chords) && s.chords.length) {
+    progression.value = [...s.chords]
+  }
+  if (s.key) {
+    selectedKey.value = noteToSharp(s.key)
+    keyType.value     = s.keyType ?? 'major'
+  }
+  if (s.bpm) bpm.value = Math.min(200, Math.max(40, Number(s.bpm)))
+  // Clear the marker so it doesn't re-apply on subsequent activations
+  const { _cadenceLoad, ...rest } = s
+  history.replaceState(rest, '')
+}
+
+// ─── Save progression dialog ──────────────────────────────────────────────────
+
+const saveDialogOpen = ref(false)
+const savingProg     = ref(false)
+const saveError      = ref('')
+const saveForm       = ref({ title: '', artist: '' })
+
+function openSaveDialog() {
+  saveForm.value = { title: '', artist: '' }
+  saveError.value = ''
+  saveDialogOpen.value = true
+}
+
+async function saveProgression() {
+  if (!saveForm.value.title.trim()) return
+  savingProg.value = true
+  saveError.value  = ''
+  try {
+    const key = selectedKey.value + (keyType.value === 'minor' ? 'm' : '')
+    const { error } = await supabase.from('songs').insert({
+      user_id:     currentUser.value.id,
+      title:       saveForm.value.title.trim(),
+      artist:      saveForm.value.artist.trim() || null,
+      bpm:         bpm.value  || null,
+      key,
+      chord_chart: progression.value,
+    })
+    if (error) throw error
+    saveDialogOpen.value = false
+  } catch (e) {
+    saveError.value = e.message
+  } finally {
+    savingProg.value = false
+  }
 }
 
 // ─── Playback engine ─────────────────────────────────────────────────────────

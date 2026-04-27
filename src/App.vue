@@ -33,9 +33,11 @@
 
     <v-main class="pb-16">
       <router-view v-slot="{ Component }">
-        <keep-alive>
-          <component :is="Component" />
-        </keep-alive>
+        <transition name="fade" mode="out-in">
+          <keep-alive>
+            <component :is="Component" />
+          </keep-alive>
+        </transition>
       </router-view>
     </v-main>
 
@@ -104,6 +106,12 @@ h1, h2, h3, h4, h5, h6,
 .v-card {
   border: 1px solid rgba(255, 255, 255, 0.06) !important;
 }
+
+/* ── Page transition ─────────────────────────────────────────────────────── */
+.fade-enter-active,
+.fade-leave-active { transition: opacity 0.14s ease; }
+.fade-enter-from,
+.fade-leave-to     { opacity: 0; }
 </style>
 
 <style scoped>
