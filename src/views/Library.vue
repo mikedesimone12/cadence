@@ -139,23 +139,38 @@
                 </v-chip>
               </div>
 
-              <!-- Chord chips -->
-              <div v-if="song.chord_chart?.length" class="d-flex flex-wrap mb-1" style="gap: 3px">
-                <v-chip
-                  v-for="(ch, ci) in song.chord_chart" :key="ci"
-                  size="x-small" variant="outlined"
-                >{{ ch }}</v-chip>
-              </div>
-
-              <!-- NNS chips -->
-              <div v-if="song.nns_chart?.length" class="d-flex flex-wrap" style="gap: 3px">
-                <v-chip
-                  v-for="(nns, ni) in song.nns_chart" :key="ni"
-                  size="x-small" variant="tonal"
-                  :color="nns && nns !== '?' ? 'surface-variant' : 'error'"
-                  class="font-weight-medium"
-                >{{ nns ?? '?' }}</v-chip>
-              </div>
+              <!-- Sections or flat chord/NNS chips -->
+              <template v-if="hasSections(song)">
+                <div class="d-flex flex-wrap mb-2" style="gap: 4px">
+                  <v-chip size="x-small" color="primary" variant="tonal">Full form</v-chip>
+                </div>
+                <div v-for="sec in song.sections" :key="sec.id" class="section-display-row mb-1">
+                  <span class="section-name-label">[{{ sec.name }}]</span>
+                  <span v-for="ch in sec.chord_chart" :key="ch" class="section-chord">{{ ch }}</span>
+                  <span class="section-arrow">→</span>
+                  <span v-for="n in sec.nns_chart" :key="n" class="section-nns">{{ n ?? '?' }}</span>
+                </div>
+                <div v-if="hasFormOrder(song)" class="d-flex flex-wrap mt-1" style="gap: 3px">
+                  <v-chip v-for="(name, fi) in song.form_order" :key="fi" size="x-small" variant="tonal" color="secondary">
+                    {{ abbrevSection(name) }}
+                  </v-chip>
+                </div>
+              </template>
+              <template v-else>
+                <!-- Chord chips -->
+                <div v-if="song.chord_chart?.length" class="d-flex flex-wrap mb-1" style="gap: 3px">
+                  <v-chip v-for="(ch, ci) in song.chord_chart" :key="ci" size="x-small" variant="outlined">{{ ch }}</v-chip>
+                </div>
+                <!-- NNS chips -->
+                <div v-if="song.nns_chart?.length" class="d-flex flex-wrap" style="gap: 3px">
+                  <v-chip
+                    v-for="(nns, ni) in song.nns_chart" :key="ni"
+                    size="x-small" variant="tonal"
+                    :color="nns && nns !== '?' ? 'surface-variant' : 'error'"
+                    class="font-weight-medium"
+                  >{{ nns ?? '?' }}</v-chip>
+                </div>
+              </template>
 
               <!-- Expanded section — click.stop so card doesn't re-toggle -->
               <v-expand-transition>
@@ -194,13 +209,23 @@
                           @click.stop="copyTransposed(song)"
                         >Copy</v-btn>
                       </div>
-                      <template v-if="transposeKeys[song.id] && song.chord_chart?.length">
-                        <div class="d-flex flex-wrap mb-1" style="gap: 3px">
-                          <v-chip
-                            v-for="(ch, ci) in transposedChords(song, transposeKeys[song.id])"
-                            :key="ci" size="x-small" color="primary" variant="tonal"
-                          >{{ ch }}</v-chip>
-                        </div>
+                      <template v-if="transposeKeys[song.id]">
+                        <template v-if="hasSections(song)">
+                          <div v-for="sec in transposedSectionsList(song, transposeKeys[song.id])" :key="sec.id" class="mb-2">
+                            <div class="text-caption text-medium-emphasis mb-1">[{{ sec.name }}]</div>
+                            <div class="d-flex flex-wrap" style="gap: 3px">
+                              <v-chip v-for="(ch, ci) in sec.chord_chart" :key="ci" size="x-small" color="primary" variant="tonal">{{ ch }}</v-chip>
+                            </div>
+                          </div>
+                        </template>
+                        <template v-else-if="song.chord_chart?.length">
+                          <div class="d-flex flex-wrap mb-1" style="gap: 3px">
+                            <v-chip
+                              v-for="(ch, ci) in transposedChords(song, transposeKeys[song.id])"
+                              :key="ci" size="x-small" color="primary" variant="tonal"
+                            >{{ ch }}</v-chip>
+                          </div>
+                        </template>
                         <div v-if="capoText(transposeKeys[song.id])" class="text-caption text-medium-emphasis mt-1">
                           <v-icon size="11" class="mr-1">mdi-music-note</v-icon>
                           {{ capoText(transposeKeys[song.id]) }}
@@ -407,21 +432,38 @@
         style="gap: 16px; max-width: 480px; margin: 0 auto; width: 100%"
       >
         <div class="text-h6 lib-title mb-2">Choose Drill Type</div>
-        <v-card
+        <v-tooltip
           v-for="dt in DRILL_TYPES" :key="dt.value"
-          class="drill-type-card w-100" variant="outlined"
-          @click="startSingleDrill(dt.value)"
+          :disabled="!isDrillTypeDisabled(dt)"
+          text="Song has no sections"
+          location="top"
         >
-          <v-card-text class="pa-4">
-            <div class="d-flex align-start" style="gap: 12px">
-              <v-icon :icon="dt.icon" color="primary" size="24" style="flex-shrink: 0; margin-top: 2px" />
-              <div>
-                <div class="text-subtitle-2 font-weight-bold mb-1">{{ dt.label }}</div>
-                <div class="text-caption text-medium-emphasis">{{ dt.description }}</div>
-              </div>
-            </div>
-          </v-card-text>
-        </v-card>
+          <template #activator="{ props }">
+            <v-card
+              v-bind="props"
+              class="drill-type-card w-100" variant="outlined"
+              :class="{ 'drill-type-card--disabled': isDrillTypeDisabled(dt) }"
+              @click="!isDrillTypeDisabled(dt) && startSingleDrill(dt.value)"
+            >
+              <v-card-text class="pa-4">
+                <div class="d-flex align-start" style="gap: 12px">
+                  <v-icon
+                    :icon="dt.icon"
+                    :color="isDrillTypeDisabled(dt) ? undefined : 'primary'"
+                    size="24" style="flex-shrink: 0; margin-top: 2px"
+                  />
+                  <div>
+                    <div
+                      class="text-subtitle-2 font-weight-bold mb-1"
+                      :class="{ 'text-medium-emphasis': isDrillTypeDisabled(dt) }"
+                    >{{ dt.label }}</div>
+                    <div class="text-caption text-medium-emphasis">{{ dt.description }}</div>
+                  </div>
+                </div>
+              </v-card-text>
+            </v-card>
+          </template>
+        </v-tooltip>
       </div>
 
       <!-- Drilling -->
@@ -504,25 +546,91 @@
           </v-expand-transition>
         </template>
 
-        <!-- Reveal -->
+        <!-- Form Drill / Section Flash -->
+        <template v-else-if="['form', 'section_flash'].includes(singleDrillType)">
+          <div class="text-caption text-medium-emphasis mb-2">
+            Section {{ singleDrillSectionIdx + 1 }} / {{ singleDrillSectionsOrdered.length }}
+          </div>
+          <div class="text-subtitle-1 font-weight-bold mb-5 lib-title">
+            {{ singleDrillSectionsOrdered[singleDrillSectionIdx]?.name }}
+          </div>
+          <div class="text-caption text-medium-emphasis mb-3">Recall the chords for this section:</div>
+          <v-expand-transition>
+            <div v-if="singleDrillReveal" class="w-100">
+              <div class="d-flex flex-wrap justify-center mb-6" style="gap: 6px">
+                <v-chip
+                  v-for="(ch, i) in (singleDrillSectionsOrdered[singleDrillSectionIdx]?.chord_chart ?? [])"
+                  :key="i" color="secondary" variant="tonal" size="small"
+                >{{ ch }}</v-chip>
+              </div>
+            </div>
+          </v-expand-transition>
+        </template>
+
+        <!-- Transition Drill -->
+        <template v-else-if="singleDrillType === 'transition'">
+          <div class="text-caption text-medium-emphasis mb-2">
+            Transition {{ singleDrillSectionIdx + 1 }} / {{ singleDrillSectionsOrdered.length }}
+          </div>
+          <div class="text-subtitle-1 font-weight-bold mb-2 lib-title d-flex align-center justify-center flex-wrap" style="gap: 4px">
+            <span>{{ singleDrillSectionsOrdered[singleDrillSectionIdx]?.name }}</span>
+            <v-icon size="14">mdi-arrow-right</v-icon>
+            <span>{{ singleDrillSectionsOrdered[singleDrillSectionIdx]?.nextName }}</span>
+          </div>
+          <div class="text-caption text-medium-emphasis mb-6">Recall the chords for the next section:</div>
+          <v-expand-transition>
+            <div v-if="singleDrillReveal" class="w-100">
+              <div class="d-flex flex-wrap justify-center mb-6" style="gap: 6px">
+                <v-chip
+                  v-for="(ch, i) in (singleDrillSectionsOrdered[singleDrillSectionIdx]?.nextSection?.chord_chart ?? [])"
+                  :key="i" color="primary" variant="tonal" size="small"
+                >{{ ch }}</v-chip>
+              </div>
+            </div>
+          </v-expand-transition>
+        </template>
+
+        <!-- Reveal button -->
         <v-btn
           v-if="!singleDrillReveal"
           color="primary" variant="flat" size="large"
           @click="revealSingleCard"
         >Reveal</v-btn>
 
-        <!-- Rate -->
-        <div v-else class="d-flex justify-center flex-wrap" style="gap: 10px">
-          <v-btn color="success" variant="tonal" size="small" :loading="singleDrillSaving" @click="rateSingleDrill('got_it')">
-            <v-icon start>mdi-check-circle-outline</v-icon>Got it
-          </v-btn>
-          <v-btn color="warning" variant="tonal" size="small" :loading="singleDrillSaving" @click="rateSingleDrill('almost')">
-            <v-icon start>mdi-minus-circle-outline</v-icon>Almost
-          </v-btn>
-          <v-btn color="error" variant="tonal" size="small" :loading="singleDrillSaving" @click="rateSingleDrill('missed')">
-            <v-icon start>mdi-close-circle-outline</v-icon>Missed
-          </v-btn>
-        </div>
+        <!-- After reveal: section types get Next or Rate; standard types get Rate immediately -->
+        <template v-else>
+          <template v-if="['form', 'section_flash', 'transition'].includes(singleDrillType)">
+            <v-btn
+              v-if="singleDrillSectionIdx < singleDrillSectionsOrdered.length - 1"
+              color="primary" variant="flat" size="large"
+              @click="advanceSingleSectionDrill"
+            >
+              Next ({{ singleDrillSectionIdx + 1 }}/{{ singleDrillSectionsOrdered.length }})
+            </v-btn>
+            <div v-else class="d-flex justify-center flex-wrap" style="gap: 10px">
+              <v-btn color="success" variant="tonal" size="small" :loading="singleDrillSaving" @click="rateSingleDrill('got_it')">
+                <v-icon start>mdi-check-circle-outline</v-icon>Got it
+              </v-btn>
+              <v-btn color="warning" variant="tonal" size="small" :loading="singleDrillSaving" @click="rateSingleDrill('almost')">
+                <v-icon start>mdi-minus-circle-outline</v-icon>Almost
+              </v-btn>
+              <v-btn color="error" variant="tonal" size="small" :loading="singleDrillSaving" @click="rateSingleDrill('missed')">
+                <v-icon start>mdi-close-circle-outline</v-icon>Missed
+              </v-btn>
+            </div>
+          </template>
+          <div v-else class="d-flex justify-center flex-wrap" style="gap: 10px">
+            <v-btn color="success" variant="tonal" size="small" :loading="singleDrillSaving" @click="rateSingleDrill('got_it')">
+              <v-icon start>mdi-check-circle-outline</v-icon>Got it
+            </v-btn>
+            <v-btn color="warning" variant="tonal" size="small" :loading="singleDrillSaving" @click="rateSingleDrill('almost')">
+              <v-icon start>mdi-minus-circle-outline</v-icon>Almost
+            </v-btn>
+            <v-btn color="error" variant="tonal" size="small" :loading="singleDrillSaving" @click="rateSingleDrill('missed')">
+              <v-icon start>mdi-close-circle-outline</v-icon>Missed
+            </v-btn>
+          </div>
+        </template>
       </div>
 
       <!-- Done -->
@@ -545,15 +653,17 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onActivated } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { useAudio } from '../composables/useAudio'
 import { supabase } from '../lib/supabase'
 import {
   progressionToNNS, transposeProgression, getCapoSuggestion,
-  noteToSharp, musicalKeys,
+  noteToSharp, musicalKeys, transposeSections,
 } from '../core/musicTheory'
 import AuthModal from '../components/AuthModal.vue'
+
+defineOptions({ name: 'LibraryView' })
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -583,16 +693,37 @@ const DRILL_TYPES = [
   {
     value: 'nns', label: 'NNS Flash', icon: 'mdi-pound',
     description: 'See the Nashville numbers — recall the chords mentally, then reveal.',
+    requiresSections: false, requiresFormOrder: false,
   },
   {
     value: 'transpose', label: 'Transpose Drill', icon: 'mdi-swap-vertical',
     description: 'See original chords — work out the transposition to a random key.',
+    requiresSections: false, requiresFormOrder: false,
   },
   {
     value: 'reverse', label: 'Reverse Drill', icon: 'mdi-magnify',
     description: 'See the chord names — identify the key and NNS numbers.',
+    requiresSections: false, requiresFormOrder: false,
+  },
+  {
+    value: 'form', label: 'Form Drill', icon: 'mdi-format-list-numbered',
+    description: 'Work through each section of the song in order.',
+    requiresSections: true, requiresFormOrder: false,
+  },
+  {
+    value: 'section_flash', label: 'Section Flash', icon: 'mdi-shuffle-variant',
+    description: 'Sections shown in random order — recall the chords for each.',
+    requiresSections: true, requiresFormOrder: false,
+  },
+  {
+    value: 'transition', label: 'Transition Drill', icon: 'mdi-arrow-right-bold',
+    description: 'Practice the chord changes between consecutive sections.',
+    requiresSections: false, requiresFormOrder: true,
   },
 ]
+
+const SECTION_ABBREV = { Intro: 'In', Verse: 'V', 'Pre-Chorus': 'PC', Chorus: 'Ch', Bridge: 'Br', Outro: 'Out', Transition: 'Tr', Interlude: 'Int', Solo: 'So', Tag: 'Tag', Coda: 'Co' }
+function abbrevSection(name) { return SECTION_ABBREV[name] ?? name.substring(0, 3) }
 
 // Chart coordinate constants (viewBox 300×70)
 const C_W  = 300
@@ -621,10 +752,7 @@ const { playChord: audioPlayChord, loadInstruments, ensureContext } = useAudio()
 
 const songs          = ref([])
 const sessions       = ref([])
-const chartData      = ref([])
-const achievements   = ref([])
-const recentActivity = ref([])
-const statsRef       = ref({ totalPracticed: 0, totalDrills: 0, avgScore: 0, streak: 0 })
+const setlistCount   = ref(0)
 const isLoading      = ref(false)
 const loadError      = ref('')
 
@@ -638,19 +766,22 @@ const transposeKeys   = ref({})
 
 // ─── Drill state ─────────────────────────────────────────────────────────────
 
-const singleDrillOpen         = ref(false)
-const singleDrillSong         = ref(null)
-const singleDrillType         = ref(null)
-const singleDrillPhase        = ref('select')
-const singleDrillReveal       = ref(false)
-const singleDrillRating       = ref(null)
-const singleDrillSaving       = ref(false)
-const singleDrillTransposeKey = ref(null)
+const singleDrillOpen            = ref(false)
+const singleDrillSong            = ref(null)
+const singleDrillType            = ref(null)
+const singleDrillPhase           = ref('select')
+const singleDrillReveal          = ref(false)
+const singleDrillRating          = ref(null)
+const singleDrillSaving          = ref(false)
+const singleDrillTransposeKey    = ref(null)
+const singleDrillSectionsOrdered = ref([])
+const singleDrillSectionIdx      = ref(0)
 
 // ─── Load all data ────────────────────────────────────────────────────────────
 
 async function loadAllData() {
   if (!currentUser.value) return
+  console.log('[Library] loadAllData fired')
   isLoading.value = true
   loadError.value = ''
 
@@ -689,13 +820,9 @@ async function loadAllData() {
       if (scoreMap[s.song_id].length < 3) scoreMap[s.song_id].push(s.score)
     })
 
-    songs.value    = songList.map(s => ({ ...s, recentScores: scoreMap[s.id] ?? [] }))
-    sessions.value = sessionList
-
-    statsRef.value     = computeStats(sessionList)
-    chartData.value    = buildChartData(sessionList)
-    achievements.value = computeAchievements(songList, sessionList, slCount ?? 0)
-    recentActivity.value = buildActivity(sessionList.slice(0, 10), songList)
+    songs.value      = songList.map(s => ({ ...s, recentScores: scoreMap[s.id] ?? [] }))
+    sessions.value   = sessionList
+    setlistCount.value = slCount ?? 0
   } catch (e) {
     loadError.value = e.message
   } finally {
@@ -826,8 +953,13 @@ const filteredSongs = computed(() => {
   }
 })
 
+const computedStats = computed(() => computeStats(sessions.value))
+const chartData     = computed(() => buildChartData(sessions.value))
+const achievements  = computed(() => computeAchievements(songs.value, sessions.value, setlistCount.value))
+const recentActivity = computed(() => buildActivity(sessions.value.slice(0, 10), songs.value))
+
 const statCards = computed(() => {
-  const { totalPracticed, totalDrills, avgScore, streak } = statsRef.value
+  const { totalPracticed, totalDrills, avgScore, streak } = computedStats.value
   return [
     { label: 'Songs practiced', value: totalPracticed },
     { label: 'Drill sessions',  value: totalDrills },
@@ -906,11 +1038,32 @@ function capoText(toKey) {
   return cap ? `Play ${cap.playKey} shapes · capo ${cap.fret}` : null
 }
 
+function hasSections(song) { return Array.isArray(song?.sections) && song.sections.length > 0 }
+function hasFormOrder(song) { return Array.isArray(song?.form_order) && song.form_order.length > 1 }
+
+function transposedSectionsList(song, toKey) {
+  if (!hasSections(song) || !song.key || !toKey) return []
+  const { root } = parseKey(song.key)
+  if (!root) return []
+  return transposeSections(song.sections, root, toKey)
+}
+
+function isDrillTypeDisabled(dt) {
+  if (dt.requiresSections)  return !hasSections(singleDrillSong.value)
+  if (dt.requiresFormOrder) return !hasFormOrder(singleDrillSong.value)
+  return false
+}
+
 async function copyTransposed(song) {
   const toKey = transposeKeys.value[song.id]
   if (!toKey) return
-  const chords = transposedChords(song, toKey)
-  try { await navigator.clipboard.writeText(chords.join(', ')) } catch { /* unavailable */ }
+  let text
+  if (hasSections(song)) {
+    text = transposedSectionsList(song, toKey).map(s => `[${s.name}] ${s.chord_chart.join(', ')}`).join('\n')
+  } else {
+    text = transposedChords(song, toKey).join(', ')
+  }
+  try { await navigator.clipboard.writeText(text) } catch { /* unavailable */ }
 }
 
 // ─── Activity helpers ─────────────────────────────────────────────────────────
@@ -953,10 +1106,13 @@ function openInPlay(song) {
     path: '/play',
     state: {
       _cadenceLoad: true,
-      chords:  song.chord_chart,
-      key:     root ?? 'C',
-      keyType: type,
-      bpm:     song.bpm ?? 80,
+      songTitle:  song.title + (song.artist ? ' — ' + song.artist : ''),
+      chords:     [...song.chord_chart],
+      key:        root ?? 'C',
+      keyType:    type,
+      bpm:        song.bpm ?? 80,
+      sections:   song.sections  ? JSON.parse(JSON.stringify(song.sections))  : [],
+      formOrder:  song.form_order ? [...song.form_order] : [],
     },
   })
 }
@@ -1002,14 +1158,50 @@ const doneLabel = computed(() => {
   return 'Keep practicing'
 })
 
+function initSingleSectionDrill(song, type) {
+  singleDrillSectionIdx.value = 0
+  if (type === 'form') {
+    singleDrillSectionsOrdered.value = [...(song.sections ?? [])]
+  } else if (type === 'section_flash') {
+    const arr = [...(song.sections ?? [])]
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[arr[i], arr[j]] = [arr[j], arr[i]]
+    }
+    singleDrillSectionsOrdered.value = arr
+  } else if (type === 'transition') {
+    const sects = song.sections ?? []
+    const sectMap = {}
+    sects.forEach(s => { sectMap[s.name] = s })
+    const pairs = []
+    const seen = new Set()
+    const fo = song.form_order ?? []
+    for (let i = 0; i < fo.length - 1; i++) {
+      const key = fo[i] + '→' + fo[i + 1]
+      if (!seen.has(key)) {
+        seen.add(key)
+        pairs.push({ name: fo[i], nextName: fo[i + 1], nextSection: sectMap[fo[i + 1]] ?? null })
+      }
+    }
+    singleDrillSectionsOrdered.value = pairs
+  }
+}
+
+function advanceSingleSectionDrill() {
+  singleDrillSectionIdx.value++
+  singleDrillReveal.value = false
+}
+
 function openSingleDrill(song) {
-  singleDrillSong.value         = song
-  singleDrillType.value         = null
-  singleDrillPhase.value        = 'select'
-  singleDrillReveal.value       = false
-  singleDrillRating.value       = null
-  singleDrillTransposeKey.value = null
-  singleDrillOpen.value         = true
+  singleDrillSong.value            = song
+  singleDrillType.value            = null
+  singleDrillPhase.value           = 'select'
+  singleDrillReveal.value          = false
+  singleDrillRating.value          = null
+  singleDrillTransposeKey.value    = null
+  singleDrillSectionsOrdered.value = []
+  singleDrillSectionIdx.value      = 0
+  singleDrillOpen.value            = true
   loadInstruments()
 }
 
@@ -1018,6 +1210,7 @@ function startSingleDrill(type) {
   singleDrillPhase.value  = 'drilling'
   singleDrillReveal.value = false
   if (type === 'transpose') pickDrillTransposeKey()
+  if (['form', 'section_flash', 'transition'].includes(type)) initSingleSectionDrill(singleDrillSong.value, type)
 }
 
 function pickDrillTransposeKey() {
@@ -1032,9 +1225,16 @@ async function revealSingleCard() {
   singleDrillReveal.value = true
   try {
     await ensureContext()
-    const chords = singleDrillType.value === 'transpose'
-      ? singleDrillTransposedChords.value
-      : singleDrillChords.value
+    let chords
+    if (['form', 'section_flash'].includes(singleDrillType.value)) {
+      chords = singleDrillSectionsOrdered.value[singleDrillSectionIdx.value]?.chord_chart ?? []
+    } else if (singleDrillType.value === 'transition') {
+      chords = singleDrillSectionsOrdered.value[singleDrillSectionIdx.value]?.nextSection?.chord_chart ?? []
+    } else {
+      chords = singleDrillType.value === 'transpose'
+        ? singleDrillTransposedChords.value
+        : singleDrillChords.value
+    }
     chords.forEach((chord, i) => setTimeout(() => audioPlayChord(chord), i * 400))
   } catch { /* non-blocking */ }
 }
@@ -1055,6 +1255,11 @@ async function rateSingleDrill(rating) {
   singleDrillRating.value = rating
   singleDrillPhase.value  = 'done'
 }
+
+onBeforeRouteLeave(() => {
+  singleDrillOpen.value = false
+  authOpen.value        = false
+})
 </script>
 
 <style scoped>
@@ -1198,5 +1403,52 @@ async function rateSingleDrill(rating) {
 .drill-type-card:hover {
   border-color: rgba(200, 169, 110, 0.4) !important;
   background: rgba(200, 169, 110, 0.04) !important;
+}
+.drill-type-card--disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.drill-type-card--disabled:hover {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  background: transparent !important;
+}
+
+/* ── Section display (song cards) ───────────────────────────────────────── */
+.section-display-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72rem;
+  line-height: 1.6;
+}
+.section-name-label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  font-size: 0.68rem;
+  color: #C8A96E;
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+.section-chord {
+  font-weight: 500;
+  color: rgba(196, 196, 188, 0.85);
+  padding: 1px 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+.section-arrow {
+  color: rgba(196, 196, 188, 0.3);
+  font-size: 0.65rem;
+  margin: 0 1px;
+}
+.section-nns {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 0.62rem;
+  color: #6E8EAD;
+  padding: 1px 4px;
+  background: rgba(110, 142, 173, 0.08);
+  border-radius: 4px;
 }
 </style>

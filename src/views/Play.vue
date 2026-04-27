@@ -118,6 +118,17 @@
 
     <!-- ── Progression builder ───────────────────────────────────────────── -->
     <div class="section-label mb-2">Progression</div>
+
+    <!-- Section selector chips (shown when a multi-section song is loaded) -->
+    <div v-if="loadedSongSections.length" class="d-flex flex-wrap mb-2" style="gap: 6px">
+      <v-chip
+        v-for="sec in loadedSongSections" :key="sec.id"
+        size="small" variant="outlined" color="primary"
+        style="cursor: pointer"
+        @click="loadSection(sec)"
+      >{{ sec.name }}</v-chip>
+    </div>
+
     <v-card
       class="mb-4 prog-card"
       :class="{ 'prog-card--empty': !progression.length }"
@@ -132,6 +143,15 @@
 
         <!-- Chip row -->
         <div v-else>
+          <div v-if="loadedSongName" class="d-flex align-center mb-2" style="gap: 4px">
+            <v-icon size="12" color="medium-emphasis">mdi-music-note-outline</v-icon>
+            <span class="text-caption text-medium-emphasis">{{ loadedSongName }}</span>
+            <v-btn
+              icon size="x-small" variant="text"
+              style="width: 16px; height: 16px; min-width: 0"
+              @click="loadedSongName = null"
+            ><v-icon size="10">mdi-close</v-icon></v-btn>
+          </div>
           <div class="prog-chips">
             <div
               v-for="(chord, i) in progression" :key="i + '-' + chord"
@@ -347,16 +367,19 @@
 
 <script setup>
 import { ref, computed, onMounted, onActivated, onBeforeUnmount, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import * as Tone from 'tone'
-import { musicalKeys, noteToSharp, getCapoSuggestion, chordToNNS } from '@/core/musicTheory.js'
+import { musicalKeys, noteToSharp, getCapoSuggestion, chordToNNS, progressionToNNS } from '@/core/musicTheory.js'
 import { useAudio } from '../composables/useAudio'
 import { useAuth } from '../composables/useAuth'
 import { supabase } from '../lib/supabase'
 
+defineOptions({ name: 'PlayView' })
+
 // ─── Router ──────────────────────────────────────────────────────────────────
 
 const router = useRouter()
+const route  = useRoute()
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -402,6 +425,8 @@ const { currentUser } = useAuth()
 const userSongs       = ref([])
 const loadingSongs    = ref(false)
 const songMenuOpen    = ref(false)
+const loadedSongName  = ref(null)
+const loadedSong      = ref(null)  // { displayTitle, sections, form_order }
 
 // Playback reactive state
 const bpm             = ref(80)
@@ -436,6 +461,11 @@ onActivated(() => {
   if (isAudible.value && !isLoaded.value) loadInstruments()
   applyHistoryState()
 })
+
+// Belt-and-suspenders: catches state even if onActivated fires before
+// the router has committed the new history entry (timing edge case).
+watch(() => route.path, (p) => { if (p === '/play') applyHistoryState() })
+
 watch(isAudible, v => { if (v && !isLoaded.value) loadInstruments() })
 
 // Keep Transport BPM in sync with slider
@@ -491,8 +521,9 @@ const capoSuggestion = computed(() => {
 // ─── Interaction ─────────────────────────────────────────────────────────────
 
 async function handleChordTap(chord) {
-  // Always add to progression
   progression.value.push(chord)
+  loadedSongName.value = null
+  loadedSong.value     = null
 
   // Audio preview
   if (isAudible.value && isLoaded.value) {
@@ -538,7 +569,9 @@ function removeFromProgression(index) {
 
 function clearProgression() {
   if (isPlaying.value) stopPlayback()
-  progression.value = []
+  progression.value    = []
+  loadedSongName.value = null
+  loadedSong.value     = null
 }
 
 function onProgDragStart(index, event) {
@@ -563,7 +596,7 @@ async function fetchUserSongs() {
   try {
     const { data } = await supabase
       .from('songs')
-      .select('id, title, artist, bpm, chord_chart')
+      .select('id, title, artist, key, bpm, chord_chart, sections, form_order')
       .eq('user_id', currentUser.value.id)
       .not('chord_chart', 'is', null)
       .order('title')
@@ -573,10 +606,35 @@ async function fetchUserSongs() {
   }
 }
 
+const loadedSongSections = computed(() => {
+  const song = loadedSong.value
+  if (!song || !Array.isArray(song.sections) || !song.sections.length) return []
+  return song.sections
+})
+
 function loadFromSong(song) {
   if (isPlaying.value) stopPlayback()
   progression.value = [...song.chord_chart]
+  const displayTitle = song.title + (song.artist ? ' — ' + song.artist : '')
+  loadedSongName.value = displayTitle
+  loadedSong.value = {
+    displayTitle,
+    sections:   song.sections   ?? [],
+    form_order: song.form_order ?? [],
+  }
   if (song.bpm) bpm.value = Math.min(200, Math.max(40, song.bpm))
+  if (song.key) {
+    const isMinor = song.key.length > 1 && song.key.endsWith('m')
+    selectedKey.value = noteToSharp(isMinor ? song.key.slice(0, -1) : song.key)
+    keyType.value = isMinor ? 'minor' : 'major'
+  }
+}
+
+function loadSection(section) {
+  if (isPlaying.value) stopPlayback()
+  progression.value = [...(section.chord_chart ?? [])]
+  const song = loadedSong.value
+  loadedSongName.value = song ? song.displayTitle + ' · ' + section.name : section.name
 }
 
 // ─── Load from router navigation state ───────────────────────────────────────
@@ -586,14 +644,22 @@ function applyHistoryState() {
   if (!s?._cadenceLoad) return
   if (isPlaying.value) stopPlayback()
   if (Array.isArray(s.chords) && s.chords.length) {
-    progression.value = [...s.chords]
+    progression.value = s.chords.map(String)
   }
   if (s.key) {
-    selectedKey.value = noteToSharp(s.key)
-    keyType.value     = s.keyType ?? 'major'
+    selectedKey.value = noteToSharp(String(s.key))
+    keyType.value     = s.keyType === 'minor' ? 'minor' : 'major'
   }
   if (s.bpm) bpm.value = Math.min(200, Math.max(40, Number(s.bpm)))
-  // Clear the marker so it doesn't re-apply on subsequent activations
+  const displayTitle = s.songTitle ? String(s.songTitle) : null
+  loadedSongName.value = displayTitle
+  loadedSong.value = displayTitle
+    ? {
+        displayTitle,
+        sections:   Array.isArray(s.sections)   ? s.sections   : [],
+        form_order: Array.isArray(s.formOrder)   ? s.formOrder  : [],
+      }
+    : null
   const { _cadenceLoad, ...rest } = s
   history.replaceState(rest, '')
 }
@@ -617,6 +683,10 @@ async function saveProgression() {
   saveError.value  = ''
   try {
     const key = selectedKey.value + (keyType.value === 'minor' ? 'm' : '')
+    const majorRoot = keyType.value === 'minor' ? relativeMajorRoot.value : selectedKey.value
+    const nnsChart = progression.value.length
+      ? progressionToNNS(progression.value, majorRoot).map(n => n ?? '?')
+      : null
     const { error } = await supabase.from('songs').insert({
       user_id:     currentUser.value.id,
       title:       saveForm.value.title.trim(),
@@ -624,6 +694,7 @@ async function saveProgression() {
       bpm:         bpm.value  || null,
       key,
       chord_chart: progression.value,
+      nns_chart:   nnsChart,
     })
     if (error) throw error
     saveDialogOpen.value = false
@@ -737,6 +808,13 @@ function handleTapTempo() {
 
 onBeforeUnmount(() => {
   if (isPlaying.value) stopPlayback()
+})
+
+onBeforeRouteLeave(() => {
+  if (isPlaying.value) stopPlayback()
+  settingsOpen.value   = false
+  saveDialogOpen.value = false
+  songMenuOpen.value   = false
 })
 </script>
 

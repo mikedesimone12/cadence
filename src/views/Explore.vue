@@ -426,11 +426,13 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { musicalKeys, noteToSharp, checkKeys, chordToNNS } from '@/core/musicTheory.js'
+import { useRouter, onBeforeRouteLeave } from 'vue-router'
+import { musicalKeys, noteToSharp, checkKeys, chordToNNS, progressionToNNS } from '@/core/musicTheory.js'
 import { useAudio } from '../composables/useAudio'
 import { useAuth } from '../composables/useAuth'
 import { supabase } from '../lib/supabase'
+
+defineOptions({ name: 'ExploreView' })
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -479,6 +481,9 @@ async function saveProgression() {
   saveError.value = ''
   try {
     const key = keyPairs.value[0]?.majorRoot ?? null
+    const nnsChart = key
+      ? progressionToNNS(selectedChordsSharp.value, key).map(n => n ?? '?')
+      : null
     const { error } = await supabase.from('songs').insert({
       user_id:     currentUser.value.id,
       title:       saveForm.value.title.trim(),
@@ -486,6 +491,7 @@ async function saveProgression() {
       bpm:         saveForm.value.bpm            || null,
       key,
       chord_chart: selectedChordsSharp.value,
+      nns_chart:   nnsChart,
     })
     if (error) throw error
     saveDialogOpen.value = false
@@ -501,7 +507,7 @@ function sendToPlay(majorRoot) {
     path: '/play',
     state: {
       _cadenceLoad: true,
-      chords:  selectedChordsSharp.value,
+      chords:  [...selectedChordsSharp.value], // plain array for structured-clone
       key:     majorRoot,
       keyType: 'major',
       bpm:     80,
@@ -726,6 +732,11 @@ async function explain(modifier = null) {
 function explainDifferently() {
   explain('Explain it a completely different way — use an analogy or describe how it physically feels to hear it. Keep it shorter and more casual.')
 }
+
+onBeforeRouteLeave(() => {
+  settingsOpen.value  = false
+  saveDialogOpen.value = false
+})
 </script>
 
 <style scoped>

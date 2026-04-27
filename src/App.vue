@@ -33,9 +33,9 @@
 
     <v-main class="pb-16">
       <router-view v-slot="{ Component }">
-        <transition name="fade" mode="out-in">
+        <transition name="fade">
           <keep-alive>
-            <component :is="Component" />
+            <component :is="Component" :key="$route.name" />
           </keep-alive>
         </transition>
       </router-view>
@@ -108,8 +108,8 @@ h1, h2, h3, h4, h5, h6,
 }
 
 /* ── Page transition ─────────────────────────────────────────────────────── */
-.fade-enter-active,
-.fade-leave-active { transition: opacity 0.14s ease; }
+.fade-leave-active,
+.fade-enter-active { transition: opacity 0.1s ease; }
 .fade-enter-from,
 .fade-leave-to     { opacity: 0; }
 </style>

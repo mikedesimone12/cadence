@@ -210,3 +210,22 @@ export function getCapoSuggestion(targetKey) {
   }
   return null
 }
+
+/**
+ * Transposes all sections in a song form from one key to another.
+ * Each section's chord_chart is transposed and its nns_chart recomputed relative to toKey.
+ * Pass the major-equivalent root for both fromKey and toKey (i.e. strip 'm' for minor keys).
+ *
+ * @param {Array<{id:string,name:string,order:number,chord_chart:string[],nns_chart:string[],notes:string}>} sections
+ * @param {string} fromKey - Source key root (major equivalent).
+ * @param {string} toKey   - Target key root (major equivalent).
+ * @returns {typeof sections} New sections array with transposed chord_chart and nns_chart.
+ */
+export function transposeSections(sections, fromKey, toKey) {
+  const toSharp = noteToSharp(toKey)
+  return sections.map(section => {
+    const transposedChords = transposeProgression(section.chord_chart ?? [], fromKey, toKey)
+    const nnsChart = progressionToNNS(transposedChords, toSharp).map(n => n ?? '?')
+    return { ...section, chord_chart: transposedChords, nns_chart: nnsChart }
+  })
+}
