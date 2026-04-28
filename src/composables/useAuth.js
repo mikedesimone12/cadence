@@ -27,8 +27,14 @@ export function useAuth() {
     if (error) throw error
   }
 
-  async function signUp(email, password) {
-    const { data, error } = await supabase.auth.signUp({ email, password })
+  async function signUp(email, password, captchaToken) {
+    const { data, error } = await supabase.auth.signUp({ 
+      email, 
+      password,
+      options: {
+        captchaToken
+      }
+    })
     if (error) throw error
     return data
   }

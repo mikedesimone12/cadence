@@ -700,17 +700,12 @@ async function explain(modifier = null) {
   if (modifier) msg += `\n\n${modifier}`
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/explain', {
       method: 'POST',
       headers: {
-        'Content-Type':      'application/json',
-        'x-api-key':         import.meta.env.VITE_ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-client-side-api-key-access': 'true',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model:      'claude-sonnet-4-6',
-        max_tokens: 1000,
         system:
           "You are a knowledgeable musician talking to a friend — not a professor writing a textbook. " +
           "When someone shows you a chord progression, explain in 2–4 warm, conversational sentences " +
@@ -720,10 +715,10 @@ async function explain(modifier = null) {
       }),
     })
     if (!res.ok) throw new Error(`API error ${res.status}`)
-    explanationText.value = (await res.json()).content[0].text
+    const data = await res.json()
+    explanationText.value = data.content[0].text
   } catch (err) {
-    explanationError.value =
-      (err.message || 'Request failed') + ' — make sure VITE_ANTHROPIC_API_KEY is set in .env'
+    explanationError.value = (err.message || 'Request failed')
   } finally {
     isExplaining.value = false
   }

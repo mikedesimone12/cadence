@@ -1,0 +1,8 @@
+runtime: nodejs20
+instance_class: F1
+manual_scaling:
+  instances: 0
+handlers:
+- url: /.*
+  static_files: dist/index.html
+  upload: dist/index.html

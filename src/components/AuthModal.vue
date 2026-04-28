@@ -98,12 +98,26 @@
                 :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
                 @click:append-inner="showPassword = !showPassword"
               />
+              
+              <!-- CAPTCHA -->
+              <div class="mb-4 d-flex justify-center">
+                <vue-hcaptcha 
+                  v-if="tab === 'signup' && hcaptchaSiteKey"
+                  :sitekey="hcaptchaSiteKey"
+                  @verify="onCaptchaVerify"
+                  @expired="onCaptchaExpired"
+                  @challenge-expired="onCaptchaExpired"
+                  @error="onCaptchaError"
+                />
+              </div>
+
               <v-btn
                 type="submit"
                 color="primary"
                 variant="flat"
                 block
                 :loading="emailLoading"
+                :disabled="!captchaToken && !!hcaptchaSiteKey"
               >Create Account</v-btn>
             </v-form>
 
@@ -141,6 +155,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useAuth } from '../composables/useAuth'
+import VueHcaptcha from '@hcaptcha/vue3-hcaptcha'
 
 defineProps({ modelValue: Boolean })
 const emit = defineEmits(['update:modelValue'])
@@ -155,6 +170,23 @@ const error         = ref('')
 const googleLoading = ref(false)
 const emailLoading  = ref(false)
 const signUpSuccess = ref(false)
+
+// CAPTCHA
+const captchaToken = ref(null)
+const hcaptchaSiteKey = import.meta.env.VITE_HCAPTCHA_SITE_KEY
+
+function onCaptchaVerify(token) {
+  captchaToken.value = token
+}
+
+function onCaptchaExpired() {
+  captchaToken.value = null
+}
+
+function onCaptchaError(err) {
+  error.value = 'CAPTCHA Error: ' + err
+  captchaToken.value = null
+}
 
 async function handleGoogle() {
   googleLoading.value = true
@@ -186,9 +218,10 @@ async function handleSignUp() {
   error.value = ''
   signUpSuccess.value = false
   try {
-    await signUp(email.value, password.value)
+    await signUp(email.value, password.value, captchaToken.value)
     signUpSuccess.value = true
     password.value = ''
+    captchaToken.value = null
   } catch (err) {
     error.value = err.message
   } finally {
