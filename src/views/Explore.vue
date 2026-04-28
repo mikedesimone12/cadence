@@ -104,7 +104,7 @@
             >
               <v-chip
                 :color="chipColor(chord)"
-                variant="flat" size="default"
+                variant="tonal" size="default"
                 class="prog-chip"
               >
                 <v-icon start size="12" style="opacity:0.45">mdi-drag-vertical</v-icon>
@@ -211,7 +211,7 @@
               <div class="d-flex align-center mb-3">
                 <div class="flex-1-1">
                   <div class="key-title">{{ toDisplayNote(pair.majorRoot) }} Major</div>
-                  <div class="text-caption text-medium-emphasis">
+                  <div class="text-caption" style="color: rgba(196,196,188,0.5); margin-top: 2px;">
                     Relative minor: {{ relativeMinorDisplay(pair.majorRoot) }}
                   </div>
                 </div>
@@ -307,6 +307,7 @@
                 color="accent" variant="flat"
                 prepend-icon="mdi-lightbulb-on-outline"
                 block
+                style="font-size: 1rem; font-weight: 600; min-height: 48px;"
                 @click="explain()"
               >
                 Explain this to me
@@ -738,15 +739,17 @@ onBeforeRouteLeave(() => {
 /* ── Typography ─────────────────────────────────────────────────────────── */
 .page-title {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   font-weight: 700;
   letter-spacing: -0.02em;
+  color: #C8A96E;
+  margin-bottom: 2px;
 }
 .section-label {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 0.7rem;
+  font-size: 0.69rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: rgba(196, 196, 188, 0.5);
 }
@@ -759,9 +762,10 @@ onBeforeRouteLeave(() => {
 }
 .key-title {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.15rem;
+  font-size: 1.3rem;
   font-weight: 700;
   letter-spacing: -0.01em;
+  color: #C8A96E;
 }
 
 /* ── Progression card ───────────────────────────────────────────────────── */
@@ -803,16 +807,25 @@ onBeforeRouteLeave(() => {
 .chord-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 4px;
+  gap: 5px;
 }
 .chord-btn {
   text-transform: none !important;
   min-width:  0    !important;
-  min-height: 44px !important;
+  min-height: 52px !important;
   width:      100% !important;
-  font-size:  0.72rem !important;
+  font-size:  0.9rem !important;
+  font-weight: 500 !important;
   letter-spacing: 0 !important;
   padding: 0 4px !important;
+  transition: box-shadow 0.15s, transform 0.1s !important;
+}
+.chord-btn:active {
+  transform: scale(0.95) !important;
+}
+/* selected chord button glow */
+.v-btn.chord-btn.v-btn--variant-flat {
+  box-shadow: 0 0 12px rgba(200,169,110,0.4) !important;
 }
 
 /* ── Diatonic chord row in key card ─────────────────────────────────────── */
@@ -890,11 +903,22 @@ onBeforeRouteLeave(() => {
 
 /* ── Explanation card ───────────────────────────────────────────────────── */
 .explanation-card {
-  background: linear-gradient(
-    135deg,
-    rgba(200, 169, 110, 0.07),
-    rgba(110, 142, 173, 0.05)
-  ) !important;
-  border-color: rgba(200, 169, 110, 0.18) !important;
+  background: rgba(200,169,110,0.04) !important;
+  border-left: 3px solid #C8A96E !important;
+  border-color: rgba(200,169,110,0.2) !important;
+}
+.explanation-card p {
+  font-style: italic;
+  line-height: 1.8;
+}
+
+/* ── Key card ─────────────────────────────────────────────────────────────── */
+.key-card {
+  border-color: rgba(200, 169, 110, 0.15) !important;
+  transition: box-shadow 0.2s ease, border-color 0.2s !important;
+}
+.key-card:hover {
+  border-color: rgba(200, 169, 110, 0.3) !important;
+  box-shadow: 0 0 0 1px rgba(200,169,110,0.12) !important;
 }
 </style>

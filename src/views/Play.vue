@@ -282,7 +282,7 @@
     </div>
 
     <!-- Rhythm presets -->
-    <div class="d-flex flex-wrap mb-5" style="gap: 8px">
+    <div class="d-flex flex-wrap mb-5" style="gap: 10px">
       <v-chip
         v-for="r in RHYTHM_OPTIONS" :key="r.value"
         :color="rhythmPreset === r.value ? 'primary' : undefined"
@@ -306,22 +306,26 @@
     </v-expand-transition>
 
     <!-- Transport -->
-    <div class="d-flex justify-center" style="gap: 12px">
+    <div class="d-flex justify-center align-center" style="gap: 16px">
       <v-btn
         v-if="!isPlaying"
-        color="primary" variant="flat" size="large"
+        color="primary" variant="flat"
         :disabled="!progression.length || !isAudible"
-        prepend-icon="mdi-play"
-        style="min-width: 130px"
+        icon
+        style="width: 64px; height: 64px; border-radius: 50%;"
         @click="startPlayback"
-      >Play</v-btn>
+      >
+        <v-icon size="32">mdi-play</v-icon>
+      </v-btn>
       <v-btn
         v-else
-        color="error" variant="tonal" size="large"
-        prepend-icon="mdi-stop"
-        style="min-width: 130px"
+        color="error" variant="outlined"
+        icon
+        style="width: 48px; height: 48px; border-radius: 50%;"
         @click="stopPlayback"
-      >Stop</v-btn>
+      >
+        <v-icon size="22">mdi-stop</v-icon>
+      </v-btn>
     </div>
 
   </v-container>
@@ -822,15 +826,17 @@ onBeforeRouteLeave(() => {
 /* ── Typography ─────────────────────────────────────────────────────────── */
 .page-title {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   font-weight: 700;
   letter-spacing: -0.02em;
+  color: #C8A96E;
+  margin-bottom: 2px;
 }
 .section-label {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 0.7rem;
+  font-size: 0.69rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: rgba(196, 196, 188, 0.5);
 }
@@ -856,6 +862,8 @@ onBeforeRouteLeave(() => {
 .key-btn {
   flex-shrink: 0 !important;
   min-width: 44px !important;
+  min-height: 44px !important;
+  border-radius: 999px !important;
   text-transform: none !important;
   font-weight: 500 !important;
   letter-spacing: 0 !important;
@@ -933,14 +941,21 @@ onBeforeRouteLeave(() => {
 .chord-tile:active { transform: scale(0.93); }
 
 .chord-tile--tonic {
-  border-color: rgba(200, 169, 110, 0.3);
-  background: rgba(200, 169, 110, 0.07);
+  border-color: rgba(200, 169, 110, 0.35);
+  background: rgba(200, 169, 110, 0.09);
 }
-.chord-tile--minor { border-color: rgba(110, 142, 173, 0.2); }
-.chord-tile--dim   { border-color: rgba(207, 75, 75, 0.18); }
+.chord-tile--minor {
+  border-color: rgba(110, 142, 173, 0.3);
+  background: rgba(110, 142, 173, 0.05);
+}
+.chord-tile--dim {
+  border-color: rgba(207, 75, 75, 0.28);
+  background: rgba(207, 75, 75, 0.04);
+}
 .chord-tile--active {
-  background: rgba(200, 169, 110, 0.2) !important;
+  background: rgba(200, 169, 110, 0.22) !important;
   border-color: #C8A96E !important;
+  box-shadow: 0 0 10px rgba(200,169,110,0.25);
 }
 
 /* ── Tile labels ────────────────────────────────────────────────────────── */
@@ -969,12 +984,13 @@ onBeforeRouteLeave(() => {
 
 /* ── BPM readout ────────────────────────────────────────────────────────── */
 .bpm-readout {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.1rem;
+  font-family: 'Space Grotesk', monospace;
+  font-size: 1.3rem;
   font-weight: 700;
   color: #C8A96E;
-  min-width: 38px;
+  min-width: 46px;
   text-align: right;
+  letter-spacing: -0.02em;
 }
 
 /* ── Playback display ───────────────────────────────────────────────────── */

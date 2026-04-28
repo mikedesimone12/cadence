@@ -21,7 +21,7 @@
       <!-- ── Left: Setlist Manager ─────────────────────────────────────────── -->
       <v-col cols="12" md="4">
         <div class="d-flex align-center mb-3">
-          <span class="text-h6 panel-title">Setlists</span>
+          <span class="panel-title section-title">Setlists</span>
           <v-spacer />
           <v-btn
             size="small" variant="text" color="primary"
@@ -92,7 +92,13 @@
                   </div>
                 </div>
                 <div class="d-flex flex-column align-end ml-2" style="flex-shrink: 0; gap: 4px">
-                  <v-chip v-if="sl.gig_date" :color="countdownColor(sl.gig_date)" size="x-small" variant="tonal">
+                  <v-chip
+                    v-if="sl.gig_date"
+                    :color="countdownColor(sl.gig_date)"
+                    :variant="countdownColor(sl.gig_date) === 'error' ? 'flat' : 'tonal'"
+                    size="x-small"
+                    :style="countdownColor(sl.gig_date) === 'error' ? 'font-weight:700' : ''"
+                  >
                     {{ countdown(sl.gig_date) }}
                   </v-chip>
                   <v-chip size="x-small" variant="tonal" color="secondary">
@@ -101,10 +107,12 @@
                   </v-chip>
                 </div>
               </div>
-              <div class="d-flex justify-end mt-1" style="gap: 2px">
-                <v-btn icon size="x-small" variant="text" color="primary" title="Practice drill" @click.stop="openDrill(sl)">
-                  <v-icon size="14">mdi-play-circle-outline</v-icon>
-                </v-btn>
+              <div class="d-flex justify-end align-center mt-2" style="gap: 4px">
+                <v-btn
+                  size="x-small" variant="tonal" color="primary"
+                  prepend-icon="mdi-play-circle-outline"
+                  @click.stop="openDrill(sl)"
+                >Practice</v-btn>
                 <v-btn icon size="x-small" variant="text" color="error" @click.stop="confirmDeleteSetlist(sl)">
                   <v-icon size="14">mdi-delete-outline</v-icon>
                 </v-btn>
@@ -125,7 +133,7 @@
         <template v-if="selectedSetlist">
           <div class="d-flex align-center mb-3">
             <div style="min-width: 0">
-              <div class="text-h6 panel-title text-truncate">{{ selectedSetlist.name }}</div>
+              <div class="panel-title section-title text-truncate">{{ selectedSetlist.name }}</div>
               <div v-if="selectedSetlist.venue || selectedSetlist.gig_date" class="text-caption text-medium-emphasis">
                 <template v-if="selectedSetlist.venue">@ {{ selectedSetlist.venue }}</template>
                 <template v-if="selectedSetlist.gig_date"> · {{ formatDate(selectedSetlist.gig_date) }}</template>
@@ -423,18 +431,16 @@
         class="flex-grow-1 d-flex flex-column align-center justify-center pa-6 text-center"
         style="max-width: 560px; margin: 0 auto; width: 100%"
       >
-        <div class="text-h6 panel-title mb-1">{{ drillCurrentSong.title }}</div>
+        <div class="drill-song-title mb-1">{{ drillCurrentSong.title }}</div>
         <div v-if="drillCurrentSong.artist" class="text-caption text-medium-emphasis mb-4">
           {{ drillCurrentSong.artist }}
         </div>
 
         <!-- NNS Flash -->
         <template v-if="drillType === 'nns'">
-          <div class="text-caption text-medium-emphasis mb-3">Recall the chords for this progression:</div>
-          <div class="d-flex flex-wrap justify-center mb-6" style="gap: 6px">
-            <v-chip v-for="(n, i) in drillNNS" :key="i" color="primary" variant="tonal" size="small">
-              {{ n ?? '?' }}
-            </v-chip>
+          <div class="drill-prompt-text mb-3">Recall the chords for this progression:</div>
+          <div class="d-flex flex-wrap justify-center mb-6" style="gap: 8px">
+            <span v-for="(n, i) in drillNNS" :key="i" class="drill-nns-number">{{ n ?? '?' }}</span>
           </div>
           <v-expand-transition>
             <div v-if="drillCardPhase === 'reveal'" class="w-100">
@@ -567,6 +573,7 @@
         <v-btn
           v-if="drillCardPhase === 'question'"
           color="primary" variant="flat" size="large"
+          block style="min-height: 52px; font-size: 1rem; font-weight: 600; max-width: 400px"
           @click="revealDrillCard"
         >Reveal</v-btn>
 
@@ -575,40 +582,44 @@
           <v-btn
             v-if="drillSectionIdx < drillSectionsOrdered.length - 1"
             color="primary" variant="tonal" size="large"
+            block style="min-height: 52px; max-width: 400px"
             @click="advanceSectionDrill"
-          >Next  <span class="text-caption ml-1">({{ drillSectionIdx + 1 }}/{{ drillSectionsOrdered.length }})</span></v-btn>
-          <div v-else class="d-flex justify-center flex-wrap" style="gap: 10px">
-            <v-btn color="success" variant="tonal" size="small" :loading="drillSavingRating" @click="rateCurrentSong('got_it')">
+          >Next <span class="text-caption ml-1">({{ drillSectionIdx + 1 }}/{{ drillSectionsOrdered.length }})</span></v-btn>
+          <div v-else class="d-flex flex-column align-center w-100" style="gap: 10px; max-width: 400px">
+            <v-btn color="success" variant="flat" block :loading="drillSavingRating" style="min-height:56px;font-size:1rem;font-weight:600" @click="rateCurrentSong('got_it')">
               <v-icon start>mdi-check-circle-outline</v-icon>Got it
             </v-btn>
-            <v-btn color="warning" variant="tonal" size="small" :loading="drillSavingRating" @click="rateCurrentSong('almost')">
+            <v-btn color="warning" variant="flat" block :loading="drillSavingRating" style="min-height:56px;font-size:1rem;font-weight:600" @click="rateCurrentSong('almost')">
               <v-icon start>mdi-minus-circle-outline</v-icon>Almost
             </v-btn>
-            <v-btn color="error" variant="tonal" size="small" :loading="drillSavingRating" @click="rateCurrentSong('missed')">
+            <v-btn color="error" variant="flat" block :loading="drillSavingRating" style="min-height:56px;font-size:1rem;font-weight:600" @click="rateCurrentSong('missed')">
               <v-icon start>mdi-close-circle-outline</v-icon>Missed
             </v-btn>
           </div>
         </template>
 
         <!-- Regular drills: rate after reveal -->
-        <div v-else class="d-flex justify-center flex-wrap" style="gap: 10px">
+        <div v-else class="d-flex flex-column align-center w-100" style="gap: 10px; max-width: 400px">
           <v-btn
-            color="success" variant="tonal" size="small"
+            color="success" variant="flat" block
             :loading="drillSavingRating"
+            style="min-height:56px;font-size:1rem;font-weight:600"
             @click="rateCurrentSong('got_it')"
           >
             <v-icon start>mdi-check-circle-outline</v-icon>Got it
           </v-btn>
           <v-btn
-            color="warning" variant="tonal" size="small"
+            color="warning" variant="flat" block
             :loading="drillSavingRating"
+            style="min-height:56px;font-size:1rem;font-weight:600"
             @click="rateCurrentSong('almost')"
           >
             <v-icon start>mdi-minus-circle-outline</v-icon>Almost
           </v-btn>
           <v-btn
-            color="error" variant="tonal" size="small"
+            color="error" variant="flat" block
             :loading="drillSavingRating"
+            style="min-height:56px;font-size:1rem;font-weight:600"
             @click="rateCurrentSong('missed')"
           >
             <v-icon start>mdi-close-circle-outline</v-icon>Missed
@@ -1767,16 +1778,18 @@ watch(currentUser, user => {
   font-family: 'Space Grotesk', sans-serif;
 }
 
+/* section-title class from global.css is also applied */
+
 .setlist-card {
   cursor: pointer;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, background 0.15s;
 }
 .setlist-card:hover {
   border-color: rgba(200, 169, 110, 0.3) !important;
 }
 .setlist-card--active {
-  border-color: #C8A96E !important;
-  background: rgba(200, 169, 110, 0.06) !important;
+  border-left: 3px solid #C8A96E !important;
+  background: rgba(200, 169, 110, 0.07) !important;
 }
 
 .song-row { cursor: grab; }
@@ -1793,8 +1806,8 @@ watch(currentUser, user => {
 .song-row:hover .drag-handle { opacity: 0.7; }
 
 .confidence-dot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
   display: inline-block;
@@ -1803,6 +1816,7 @@ watch(currentUser, user => {
 .dot--green  { background: #4B9E6F; }
 .dot--yellow { background: #C8A96E; }
 .dot--red    { background: #CF4B4B; }
+/* pulse-red animation applied via global.css .dot--red rule */
 
 .transpose-panel {
   border-top: 1px solid rgba(255, 255, 255, 0.07);
@@ -1815,6 +1829,31 @@ watch(currentUser, user => {
 .drill-type-card:hover {
   border-color: rgba(200, 169, 110, 0.4) !important;
   background: rgba(200, 169, 110, 0.04) !important;
+}
+
+/* ── Drill typography ────────────────────────────────────────────────────── */
+.drill-song-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #E8E8E0;
+  letter-spacing: -0.02em;
+}
+.drill-prompt-text {
+  font-size: 1.1rem;
+  color: rgba(196,196,188,0.7);
+  font-weight: 500;
+}
+.drill-nns-number {
+  font-family: 'Space Grotesk', monospace;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #C8A96E;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  background: rgba(200,169,110,0.1);
+  border-radius: 10px;
+  padding: 8px 18px;
 }
 
 /* ── Section display rows ─────────────────────────────────────────────────── */

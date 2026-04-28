@@ -3,7 +3,7 @@
     <div class="top-accent-line" />
 
     <!-- App bar -->
-    <v-app-bar flat height="52" class="cadence-app-bar">
+    <v-app-bar flat height="64" class="cadence-app-bar">
       <v-app-bar-title>
         <div class="app-logo">
           <img src="/favicon.svg" alt="" class="app-logo-icon" />
@@ -106,8 +106,9 @@ h1, h2, h3, h4, h5, h6,
 }
 
 /* ── Card treatment ─────────────────────────────────────────────────────── */
+/* Base card overrides are in global.css; keep this for legacy specificity */
 .v-card {
-  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
 }
 
 /* ── Page transition ─────────────────────────────────────────────────────── */
@@ -132,34 +133,43 @@ h1, h2, h3, h4, h5, h6,
 /* ── App bar ─────────────────────────────────────────────────────────────── */
 .cadence-app-bar {
   background-color: #1A1A1F !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-bottom: 1px solid rgba(200,169,110,0.2) !important;
   padding-top: 2px; /* clear the accent line */
 }
 .app-logo {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 .app-logo-icon {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   flex-shrink: 0;
 }
 .app-name {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   color: #C8A96E;
 }
 
 /* ── Bottom navigation ──────────────────────────────────────────────────── */
 .cadence-bottom-nav {
-  background-color: #1A1A1F !important;
+  background-color: #0D0D0F !important;
   border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+.cadence-bottom-nav .v-btn {
+  color: rgba(196,196,188,0.4) !important;
+  font-size: 0.72rem !important;
+  transition: color 0.15s !important;
 }
 .cadence-bottom-nav .v-btn--active,
 .cadence-bottom-nav .v-btn[aria-selected="true"] {
+  color: #C8A96E !important;
+}
+.cadence-bottom-nav .v-btn--active .v-icon,
+.cadence-bottom-nav .v-btn[aria-selected="true"] .v-icon {
   color: #C8A96E !important;
 }
 </style>

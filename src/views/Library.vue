@@ -277,6 +277,7 @@
       <v-row class="mb-4">
         <v-col v-for="s in statCards" :key="s.label" cols="6" sm="3">
           <v-card class="stat-card text-center pa-4">
+            <v-icon class="stat-icon" size="40" color="primary">{{ s.icon }}</v-icon>
             <div class="stat-value">{{ s.value }}</div>
             <div class="text-caption text-medium-emphasis mt-1">{{ s.label }}</div>
           </v-card>
@@ -307,10 +308,22 @@
               preserveAspectRatio="none"
               class="chart-svg"
             >
-              <!-- Horizontal grid lines at scores 100, 50, 0 -->
+              <defs>
+                <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#C8A96E" stop-opacity="0.25" />
+                  <stop offset="100%" stop-color="#C8A96E" stop-opacity="0" />
+                </linearGradient>
+              </defs>
+              <!-- Horizontal grid lines -->
               <line x1="0" y1="5"  x2="300" y2="5"  stroke="rgba(255,255,255,0.05)" stroke-width="1" />
               <line x1="0" y1="37" x2="300" y2="37" stroke="rgba(255,255,255,0.05)" stroke-width="1" />
               <line x1="0" y1="65" x2="300" y2="65" stroke="rgba(255,255,255,0.05)" stroke-width="1" />
+              <!-- Gradient area fill -->
+              <path
+                :d="svgAreaPath"
+                fill="url(#chartGradient)"
+                vector-effect="non-scaling-stroke"
+              />
               <!-- Gold line -->
               <path
                 :d="svgLinePath"
@@ -324,7 +337,7 @@
               <!-- Data point dots -->
               <circle
                 v-for="(pt, i) in chartDots" :key="i"
-                :cx="pt.x" :cy="pt.y" r="2.5"
+                :cx="pt.x" :cy="pt.y" r="3"
                 fill="#C8A96E"
                 vector-effect="non-scaling-stroke"
               />
@@ -387,7 +400,7 @@
           >
             <div class="d-flex flex-column align-center text-center" style="gap: 10px">
               <div class="achievement-icon-wrap" :class="{ 'achievement-icon-wrap--unlocked': a.unlocked }">
-                <v-icon :color="a.unlocked ? 'primary' : undefined" size="22">{{ a.icon }}</v-icon>
+                <v-icon :color="a.unlocked ? 'primary' : undefined" size="40">{{ a.icon }}</v-icon>
               </div>
               <div>
                 <div class="achievement-name" :class="{ 'text-primary': a.unlocked }">{{ a.label }}</div>
@@ -967,10 +980,10 @@ const recentActivity = computed(() => buildActivity(sessions.value.slice(0, 10),
 const statCards = computed(() => {
   const { totalPracticed, totalDrills, avgScore, streak } = computedStats.value
   return [
-    { label: 'Songs practiced', value: totalPracticed },
-    { label: 'Drill sessions',  value: totalDrills },
-    { label: 'Avg confidence',  value: totalDrills ? `${avgScore}%` : '—' },
-    { label: 'Day streak',      value: streak > 0 ? `${streak}` : '—' },
+    { label: 'Songs practiced', value: totalPracticed, icon: 'mdi-music-note-outline' },
+    { label: 'Drill sessions',  value: totalDrills,    icon: 'mdi-dumbbell' },
+    { label: 'Avg confidence',  value: totalDrills ? `${avgScore}%` : '—', icon: 'mdi-chart-line' },
+    { label: 'Day streak',      value: streak > 0 ? `${streak}` : '—', icon: 'mdi-fire' },
   ]
 })
 
@@ -984,6 +997,21 @@ const svgLinePath = computed(() => {
     d += moving ? `M${x},${y}` : `L${x},${y}`
     moving = false
   })
+  return d
+})
+
+const svgAreaPath = computed(() => {
+  const pts = chartData.value
+  let d = '', moving = true, firstX = null, lastX = null
+  pts.forEach((pt, i) => {
+    if (pt.avg === null) { moving = true; return }
+    const x = chartX(i).toFixed(1), y = chartY(pt.avg).toFixed(1)
+    if (moving) { d += `M${x},${y}`; if (firstX === null) firstX = x }
+    else d += `L${x},${y}`
+    lastX = x
+    moving = false
+  })
+  if (firstX !== null && lastX !== null) d += ` L${lastX},65 L${firstX},65 Z`
   return d
 })
 
@@ -1272,18 +1300,20 @@ onBeforeRouteLeave(() => {
 /* ── Typography ─────────────────────────────────────────────────────────── */
 .page-title {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   font-weight: 700;
   letter-spacing: -0.02em;
+  color: #C8A96E;
+  margin-bottom: 2px;
 }
 .lib-title {
   font-family: 'Space Grotesk', sans-serif;
 }
 .section-label {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 0.7rem;
+  font-size: 0.69rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: rgba(196, 196, 188, 0.5);
 }
@@ -1307,8 +1337,8 @@ onBeforeRouteLeave(() => {
 
 /* ── Confidence dot ─────────────────────────────────────────────────────── */
 .confidence-dot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
   display: inline-block;
@@ -1317,6 +1347,7 @@ onBeforeRouteLeave(() => {
 .dot--green  { background: #4B9E6F; }
 .dot--yellow { background: #C8A96E; }
 .dot--red    { background: #CF4B4B; }
+/* pulse-red animation applied via global.css */
 
 /* ── Expanded content ───────────────────────────────────────────────────── */
 .notes-box {
@@ -1333,15 +1364,23 @@ onBeforeRouteLeave(() => {
 
 /* ── Stat cards ─────────────────────────────────────────────────────────── */
 .stat-card {
-  border-color: rgba(200, 169, 110, 0.12) !important;
+  border-color: rgba(200, 169, 110, 0.15) !important;
+  position: relative;
+  overflow: hidden;
 }
 .stat-value {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.9rem;
-  font-weight: 800;
+  font-size: 2rem;
+  font-weight: 700;
   letter-spacing: -0.03em;
   color: #C8A96E;
   line-height: 1;
+}
+.stat-icon {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  opacity: 0.18;
 }
 
 /* ── Chart ──────────────────────────────────────────────────────────────── */
@@ -1380,23 +1419,28 @@ onBeforeRouteLeave(() => {
   transition: border-color 0.15s;
 }
 .achievement-card--unlocked {
-  border-color: rgba(200, 169, 110, 0.3) !important;
+  border-color: rgba(200, 169, 110, 0.35) !important;
+}
+.achievement-card:not(.achievement-card--unlocked) {
+  filter: grayscale(0.6);
+  opacity: 0.7;
 }
 .achievement-icon-wrap {
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.05);
   display: flex;
   align-items: center;
   justify-content: center;
 }
+/* unlocked animation in global.css */
 .achievement-icon-wrap--unlocked {
-  background: rgba(200, 169, 110, 0.15);
+  background: rgba(200, 169, 110, 0.18);
 }
 .achievement-name {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
