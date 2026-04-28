@@ -183,16 +183,23 @@
                       <template v-if="hasSections(song)">
                         <v-chip size="x-small" color="primary" variant="tonal" class="mb-1">Full form</v-chip>
                         <div v-for="sec in songSections(song)" :key="sec.id" class="section-display-row mb-1">
-                          <span class="section-name-label">[{{ sec.name }}]</span>
-                          <span v-for="(ch, ci) in sec.chord_chart" :key="ci" class="section-chord">{{ ch }}</span>
+                          <v-chip size="x-small" color="secondary" variant="tonal" class="section-name-chip">{{ sec.name }}</v-chip>
+                          <template v-for="(ch, ci) in sec.chord_chart" :key="'c'+ci">
+                            <span v-if="ci > 0" class="section-dot">·</span>
+                            <span class="section-chord">{{ ch }}</span>
+                          </template>
                           <span class="section-arrow">→</span>
-                          <span v-for="(n, ni) in sec.nns_chart" :key="ni" class="section-nns">{{ n ?? '?' }}</span>
+                          <template v-for="(n, ni) in sec.nns_chart" :key="'n'+ni">
+                            <span v-if="ni > 0" class="section-dot">·</span>
+                            <span class="section-nns">{{ n ?? '?' }}</span>
+                          </template>
                         </div>
-                        <div v-if="hasFormOrder(song)" class="d-flex flex-wrap mt-1" style="gap: 3px">
-                          <span class="text-caption text-medium-emphasis mr-1" style="font-size:0.6rem">Form:</span>
+                        <div v-if="hasFormOrder(song)" class="d-flex flex-wrap mt-1" style="gap: 6px">
+                          <span class="text-caption text-medium-emphasis mr-1" style="font-size:0.6rem; line-height:28px">Form:</span>
                           <v-chip
                             v-for="(name, fi) in song.form_order" :key="fi"
-                            size="x-small" variant="tonal" color="secondary"
+                            size="small" variant="tonal" color="secondary"
+                            style="min-height: 28px"
                           >{{ abbrevSection(name) }}</v-chip>
                         </div>
                       </template>
@@ -1808,5 +1815,46 @@ watch(currentUser, user => {
 .drill-type-card:hover {
   border-color: rgba(200, 169, 110, 0.4) !important;
   background: rgba(200, 169, 110, 0.04) !important;
+}
+
+/* ── Section display rows ─────────────────────────────────────────────────── */
+.section-display-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72rem;
+  line-height: 1.6;
+}
+.section-name-chip {
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+.section-chord {
+  font-weight: 500;
+  color: rgba(196, 196, 188, 0.85);
+  padding: 1px 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+.section-dot {
+  color: rgba(196, 196, 188, 0.3);
+  font-size: 0.65rem;
+  flex-shrink: 0;
+}
+.section-arrow {
+  color: rgba(196, 196, 188, 0.4);
+  font-size: 0.65rem;
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+.section-nns {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 0.62rem;
+  color: #6E8EAD;
+  padding: 1px 4px;
+  background: rgba(110, 142, 173, 0.08);
+  border-radius: 4px;
 }
 </style>

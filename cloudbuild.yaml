@@ -1,0 +1,19 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+  - build
+  - --build-arg
+  - VITE_SUPABASE_URL=$_VITE_SUPABASE_URL
+  - --build-arg
+  - VITE_SUPABASE_ANON_KEY=$_VITE_SUPABASE_ANON_KEY
+  - --build-arg
+  - VITE_HCAPTCHA_SITE_KEY=$_VITE_HCAPTCHA_SITE_KEY
+  - -t
+  - us-central1-docker.pkg.dev/cadence-491202/cloud-run-source-deploy/cadence-frontend:latest
+  - .
+images:
+- us-central1-docker.pkg.dev/cadence-491202/cloud-run-source-deploy/cadence-frontend:latest
+substitutions:
+  _VITE_SUPABASE_URL: ''
+  _VITE_SUPABASE_ANON_KEY: ''
+  _VITE_HCAPTCHA_SITE_KEY: ''

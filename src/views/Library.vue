@@ -145,13 +145,19 @@
                   <v-chip size="x-small" color="primary" variant="tonal">Full form</v-chip>
                 </div>
                 <div v-for="sec in song.sections" :key="sec.id" class="section-display-row mb-1">
-                  <span class="section-name-label">[{{ sec.name }}]</span>
-                  <span v-for="ch in sec.chord_chart" :key="ch" class="section-chord">{{ ch }}</span>
+                  <v-chip size="x-small" color="secondary" variant="tonal" class="section-name-chip">{{ sec.name }}</v-chip>
+                  <template v-for="(ch, ci) in sec.chord_chart" :key="'c'+ci">
+                    <span v-if="ci > 0" class="section-dot">·</span>
+                    <span class="section-chord">{{ ch }}</span>
+                  </template>
                   <span class="section-arrow">→</span>
-                  <span v-for="n in sec.nns_chart" :key="n" class="section-nns">{{ n ?? '?' }}</span>
+                  <template v-for="(n, ni) in sec.nns_chart" :key="'n'+ni">
+                    <span v-if="ni > 0" class="section-dot">·</span>
+                    <span class="section-nns">{{ n ?? '?' }}</span>
+                  </template>
                 </div>
-                <div v-if="hasFormOrder(song)" class="d-flex flex-wrap mt-1" style="gap: 3px">
-                  <v-chip v-for="(name, fi) in song.form_order" :key="fi" size="x-small" variant="tonal" color="secondary">
+                <div v-if="hasFormOrder(song)" class="d-flex flex-wrap mt-1" style="gap: 6px">
+                  <v-chip v-for="(name, fi) in song.form_order" :key="fi" size="small" variant="tonal" color="secondary" style="min-height: 28px">
                     {{ abbrevSection(name) }}
                   </v-chip>
                 </div>
@@ -1422,11 +1428,7 @@ onBeforeRouteLeave(() => {
   font-size: 0.72rem;
   line-height: 1.6;
 }
-.section-name-label {
-  font-family: 'Space Grotesk', sans-serif;
-  font-weight: 600;
-  font-size: 0.68rem;
-  color: #C8A96E;
+.section-name-chip {
   flex-shrink: 0;
   margin-right: 2px;
 }
@@ -1437,10 +1439,16 @@ onBeforeRouteLeave(() => {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 4px;
 }
-.section-arrow {
+.section-dot {
   color: rgba(196, 196, 188, 0.3);
   font-size: 0.65rem;
-  margin: 0 1px;
+  flex-shrink: 0;
+}
+.section-arrow {
+  color: rgba(196, 196, 188, 0.4);
+  font-size: 0.65rem;
+  margin: 0 6px;
+  flex-shrink: 0;
 }
 .section-nns {
   font-family: 'Space Grotesk', sans-serif;

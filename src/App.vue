@@ -5,7 +5,10 @@
     <!-- App bar -->
     <v-app-bar flat height="52" class="cadence-app-bar">
       <v-app-bar-title>
-        <span class="app-name">Cadence</span>
+        <div class="app-logo">
+          <img src="/favicon.svg" alt="" class="app-logo-icon" />
+          <span class="app-name">Cadence</span>
+        </div>
       </v-app-bar-title>
       <template #append>
         <template v-if="currentUser">
@@ -131,6 +134,16 @@ h1, h2, h3, h4, h5, h6,
   background-color: #1A1A1F !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
   padding-top: 2px; /* clear the accent line */
+}
+.app-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.app-logo-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
 }
 .app-name {
   font-family: 'Space Grotesk', sans-serif;
