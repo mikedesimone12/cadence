@@ -2,7 +2,7 @@
   <v-container fluid class="pb-8 px-3">
 
     <!-- ── Page header ────────────────────────────────────────────────────── -->
-    <v-row align="center" class="mb-1" no-gutters>
+    <v-row align="center" class="mb-6" no-gutters>
       <v-col>
         <div class="page-title">Explore</div>
         <div class="text-caption text-medium-emphasis">Build a progression · Find your key</div>

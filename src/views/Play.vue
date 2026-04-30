@@ -2,7 +2,7 @@
   <v-container fluid class="pb-8 px-3">
 
     <!-- ── Page header ────────────────────────────────────────────────────── -->
-    <v-row align="center" class="mb-1" no-gutters>
+    <v-row align="center" class="mb-6" no-gutters>
       <v-col>
         <div class="page-title">Play</div>
         <div class="text-caption text-medium-emphasis">Pick a key · Tap chords</div>
@@ -1007,7 +1007,7 @@ onBeforeRouteLeave(() => {
   line-height: 1;
 }
 .next-chord-hint {
-  font-size: 0.85rem;
+  font-size: 1.2rem;
   color: rgba(196, 196, 188, 0.45);
   margin-top: 6px;
   letter-spacing: 0.02em;

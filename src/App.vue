@@ -148,7 +148,7 @@ h1, h2, h3, h4, h5, h6,
 }
 .app-name {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.2rem;
+  font-size: 1.6rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: #C8A96E;

@@ -19,7 +19,7 @@
   <v-container v-else fluid class="pa-3 pa-md-5" style="max-width: 1200px">
     <v-row>
       <!-- ── Left: Setlist Manager ─────────────────────────────────────────── -->
-      <v-col cols="12" md="4">
+      <v-col cols="12" md="4" class="gig-left-panel">
         <div class="d-flex align-center mb-3">
           <span class="panel-title section-title">Setlists</span>
           <v-spacer />
@@ -129,7 +129,7 @@
       </v-col>
 
       <!-- ── Right: Song Manager ───────────────────────────────────────────── -->
-      <v-col cols="12" md="8">
+      <v-col cols="12" md="8" class="gig-right-panel">
         <template v-if="selectedSetlist">
           <div class="d-flex align-center mb-3">
             <div style="min-width: 0">
@@ -162,28 +162,31 @@
               @dragend="onDragEnd"
             >
               <v-card>
-                <v-card-text class="pa-3">
+                <v-card-text class="pa-4">
                   <div class="d-flex align-start" style="gap: 8px">
                     <v-icon size="18" color="medium-emphasis" class="drag-handle mt-1" style="flex-shrink: 0">
                       mdi-drag-vertical
                     </v-icon>
                     <div class="flex-grow-1" style="min-width: 0">
-                      <div class="d-flex align-center flex-wrap mb-1" style="gap: 6px">
-                        <span class="text-subtitle-2 font-weight-bold">{{ song.title }}</span>
-                        <span v-if="song.artist" class="text-caption text-medium-emphasis">
-                          — {{ song.artist }}
-                        </span>
+                      <div class="d-flex align-start justify-space-between mb-1">
+                        <div style="min-width: 0; flex: 1">
+                          <div class="song-card-title text-truncate">{{ song.title }}</div>
+                          <div v-if="song.artist" class="song-card-artist text-truncate">
+                            {{ song.artist }}
+                          </div>
+                        </div>
                         <span
-                          class="confidence-dot"
+                          class="confidence-dot ml-2"
                           :class="confidenceClass(song.recentScores)"
                           :title="confidenceTitle(song.recentScores)"
+                          style="flex-shrink: 0; margin-top: 3px"
                         />
                       </div>
                       <div v-if="song.key || song.bpm" class="d-flex flex-wrap mb-2" style="gap: 4px">
                         <v-chip v-if="song.key" size="x-small" color="primary" variant="tonal">
                           {{ song.key }}
                         </v-chip>
-                        <v-chip v-if="song.bpm" size="x-small" color="secondary" variant="tonal">
+                        <v-chip v-if="song.bpm" size="x-small" variant="flat" class="chip-bpm">
                           {{ song.bpm }} BPM
                         </v-chip>
                       </div>
@@ -191,7 +194,7 @@
                       <template v-if="hasSections(song)">
                         <v-chip size="x-small" color="primary" variant="tonal" class="mb-1">Full form</v-chip>
                         <div v-for="sec in songSections(song)" :key="sec.id" class="section-display-row mb-1">
-                          <v-chip size="x-small" color="secondary" variant="tonal" class="section-name-chip">{{ sec.name }}</v-chip>
+                          <v-chip size="x-small" variant="flat" class="chip-section section-name-chip">{{ sec.name }}</v-chip>
                           <template v-for="(ch, ci) in sec.chord_chart" :key="'c'+ci">
                             <span v-if="ci > 0" class="section-dot">·</span>
                             <span class="section-chord">{{ ch }}</span>
@@ -206,7 +209,7 @@
                           <span class="text-caption text-medium-emphasis mr-1" style="font-size:0.6rem; line-height:28px">Form:</span>
                           <v-chip
                             v-for="(name, fi) in song.form_order" :key="fi"
-                            size="small" variant="tonal" color="secondary"
+                            size="small" variant="flat" class="chip-section"
                             style="min-height: 28px"
                           >{{ abbrevSection(name) }}</v-chip>
                         </div>
@@ -217,7 +220,8 @@
                           <v-chip
                             v-for="(chord, ci) in parsedChords(song)"
                             :key="ci"
-                            size="x-small" variant="outlined"
+                            size="x-small" variant="flat"
+                            :class="chordQualityClass(chord)"
                           >{{ chord }}</v-chip>
                         </div>
                         <div v-if="songNNS(song).length" class="d-flex flex-wrap" style="gap: 4px">
@@ -226,7 +230,7 @@
                             :key="ni"
                             size="x-small" variant="tonal"
                             :color="nns ? 'surface-variant' : 'error'"
-                            class="font-weight-medium"
+                            class="font-weight-medium chip-nns-style"
                           >{{ nns ?? '?' }}</v-chip>
                         </div>
                       </template>
@@ -443,7 +447,7 @@
             <span v-for="(n, i) in drillNNS" :key="i" class="drill-nns-number">{{ n ?? '?' }}</span>
           </div>
           <v-expand-transition>
-            <div v-if="drillCardPhase === 'reveal'" class="w-100">
+            <div v-if="drillCardPhase === 'reveal'" class="w-100 drill-reveal-content">
               <div class="text-caption text-medium-emphasis mb-2">
                 Chords ({{ drillCurrentSong.key }}):
               </div>
@@ -469,7 +473,7 @@
           </div>
           <div class="text-caption text-medium-emphasis mb-6">Work out the transposed chords…</div>
           <v-expand-transition>
-            <div v-if="drillCardPhase === 'reveal'" class="w-100">
+            <div v-if="drillCardPhase === 'reveal'" class="w-100 drill-reveal-content">
               <div class="text-caption text-medium-emphasis mb-2">
                 Transposed to {{ drillCurrentTransposeKey }}:
               </div>
@@ -489,7 +493,7 @@
             <v-chip v-for="(ch, i) in drillChords" :key="i" variant="outlined" size="small">{{ ch }}</v-chip>
           </div>
           <v-expand-transition>
-            <div v-if="drillCardPhase === 'reveal'" class="w-100">
+            <div v-if="drillCardPhase === 'reveal'" class="w-100 drill-reveal-content">
               <div class="text-caption text-medium-emphasis mb-2">
                 Key: <strong>{{ drillCurrentSong.key }}</strong>
               </div>
@@ -512,7 +516,7 @@
             {{ drillSectionsOrdered[drillSectionIdx]?.name ?? '—' }}
           </v-chip>
           <v-expand-transition>
-            <div v-if="drillCardPhase === 'reveal'" class="w-100">
+            <div v-if="drillCardPhase === 'reveal'" class="w-100 drill-reveal-content">
               <div class="d-flex flex-wrap justify-center mb-2" style="gap: 6px">
                 <v-chip v-for="(ch, i) in drillSectionsOrdered[drillSectionIdx]?.chord_chart ?? []" :key="i" color="secondary" variant="tonal" size="small">{{ ch }}</v-chip>
               </div>
@@ -533,7 +537,7 @@
             <v-chip v-for="(ch, i) in drillSectionsOrdered[drillSectionIdx]?.chord_chart ?? []" :key="i" variant="outlined" size="small">{{ ch }}</v-chip>
           </div>
           <v-expand-transition>
-            <div v-if="drillCardPhase === 'reveal'" class="w-100">
+            <div v-if="drillCardPhase === 'reveal'" class="w-100 drill-reveal-content">
               <v-chip color="primary" variant="flat" class="mb-3 px-4" style="font-size:1.1rem; font-weight:700; height:40px">
                 {{ drillSectionsOrdered[drillSectionIdx]?.name ?? '—' }}
               </v-chip>
@@ -555,7 +559,7 @@
           </v-chip>
           <div class="text-caption text-medium-emphasis mb-6">What comes next in the form?</div>
           <v-expand-transition>
-            <div v-if="drillCardPhase === 'reveal'" class="w-100">
+            <div v-if="drillCardPhase === 'reveal'" class="w-100 drill-reveal-content">
               <v-chip color="primary" variant="flat" class="mb-3 px-4" style="font-size:1.1rem; font-weight:700; height:40px">
                 {{ drillSectionsOrdered[drillSectionIdx]?.nextName ?? '—' }}
               </v-chip>
@@ -1307,6 +1311,13 @@ function parsedChords(song) {
   return song.chord_chart
 }
 
+function chordQualityClass(chord) {
+  if (!chord) return ''
+  if (chord.endsWith('dim')) return 'chip-dim'
+  if (chord.endsWith('m'))   return 'chip-minor'
+  return 'chip-major'
+}
+
 function hasSections(song) {
   return Array.isArray(song.sections) && song.sections.length > 0
 }
@@ -1780,6 +1791,17 @@ watch(currentUser, user => {
 
 /* section-title class from global.css is also applied */
 
+/* ── Two-panel vertical divider (desktop) ────────────────────────────────── */
+@media (min-width: 960px) {
+  .gig-left-panel {
+    border-right: 1px solid rgba(255,255,255,0.06);
+    padding-right: 20px !important;
+  }
+  .gig-right-panel {
+    padding-left: 20px !important;
+  }
+}
+
 .setlist-card {
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
@@ -1830,17 +1852,25 @@ watch(currentUser, user => {
   border-color: rgba(200, 169, 110, 0.4) !important;
   background: rgba(200, 169, 110, 0.04) !important;
 }
+.drill-type-card--disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.drill-type-card--disabled:hover {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  background: transparent !important;
+}
 
 /* ── Drill typography ────────────────────────────────────────────────────── */
 .drill-song-title {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.5rem;
+  font-size: 2.2rem;
   font-weight: 700;
   color: #E8E8E0;
   letter-spacing: -0.02em;
 }
 .drill-prompt-text {
-  font-size: 1.1rem;
+  font-size: 2rem;
   color: rgba(196,196,188,0.7);
   font-weight: 500;
 }
@@ -1854,6 +1884,31 @@ watch(currentUser, user => {
   background: rgba(200,169,110,0.1);
   border-radius: 10px;
   padding: 8px 18px;
+}
+
+/* ── Song card title / artist ────────────────────────────────────────────── */
+.song-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #E8E8E0;
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: -0.01em;
+}
+.song-card-artist {
+  font-size: 0.85rem;
+  color: rgba(196,196,188,0.55);
+  margin-top: 1px;
+}
+
+/* ── Section row builder (song form editor) ──────────────────────────────── */
+.section-row-builder {
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.02);
+  transition: border-color 0.15s;
+}
+.section-row--over {
+  border-color: rgba(200,169,110,0.4) !important;
 }
 
 /* ── Section display rows ─────────────────────────────────────────────────── */

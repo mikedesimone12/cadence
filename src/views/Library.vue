@@ -20,7 +20,7 @@
   <v-container v-else fluid class="pb-10 px-3">
 
     <!-- Page header -->
-    <v-row align="center" class="mb-1" no-gutters>
+    <v-row align="center" class="mb-6" no-gutters>
       <v-col>
         <div class="page-title">Library</div>
         <div class="text-caption text-medium-emphasis">Your songs · Practice stats · Progress</div>
@@ -114,7 +114,7 @@
               <div class="d-flex align-start justify-space-between mb-2">
                 <div style="min-width: 0; flex: 1">
                   <div class="song-title text-truncate">{{ song.title }}</div>
-                  <div v-if="song.artist" class="text-caption text-medium-emphasis text-truncate">
+                  <div v-if="song.artist" class="lib-song-artist text-truncate">
                     {{ song.artist }}
                   </div>
                 </div>
@@ -132,8 +132,8 @@
 
               <!-- Badges -->
               <div class="d-flex flex-wrap mb-2" style="gap: 4px">
-                <v-chip v-if="song.key" size="x-small" color="primary"   variant="tonal">{{ song.key }}</v-chip>
-                <v-chip v-if="song.bpm" size="x-small" color="secondary" variant="tonal">{{ song.bpm }} BPM</v-chip>
+                <v-chip v-if="song.key" size="x-small" color="primary" variant="tonal">{{ song.key }}</v-chip>
+                <v-chip v-if="song.bpm" size="x-small" variant="flat" class="chip-bpm">{{ song.bpm }} BPM</v-chip>
                 <v-chip                 size="x-small" color="surface-variant" variant="tonal" class="text-caption" style="opacity:.6">
                   {{ formatDate(song.created_at) }}
                 </v-chip>
@@ -145,7 +145,7 @@
                   <v-chip size="x-small" color="primary" variant="tonal">Full form</v-chip>
                 </div>
                 <div v-for="sec in song.sections" :key="sec.id" class="section-display-row mb-1">
-                  <v-chip size="x-small" color="secondary" variant="tonal" class="section-name-chip">{{ sec.name }}</v-chip>
+                  <v-chip size="x-small" variant="flat" class="chip-section section-name-chip">{{ sec.name }}</v-chip>
                   <template v-for="(ch, ci) in sec.chord_chart" :key="'c'+ci">
                     <span v-if="ci > 0" class="section-dot">·</span>
                     <span class="section-chord">{{ ch }}</span>
@@ -157,7 +157,7 @@
                   </template>
                 </div>
                 <div v-if="hasFormOrder(song)" class="d-flex flex-wrap mt-1" style="gap: 6px">
-                  <v-chip v-for="(name, fi) in song.form_order" :key="fi" size="small" variant="tonal" color="secondary" style="min-height: 28px">
+                  <v-chip v-for="(name, fi) in song.form_order" :key="fi" size="small" variant="flat" class="chip-section" style="min-height: 28px">
                     {{ abbrevSection(name) }}
                   </v-chip>
                 </div>
@@ -165,7 +165,11 @@
               <template v-else>
                 <!-- Chord chips -->
                 <div v-if="song.chord_chart?.length" class="d-flex flex-wrap mb-1" style="gap: 3px">
-                  <v-chip v-for="(ch, ci) in song.chord_chart" :key="ci" size="x-small" variant="outlined">{{ ch }}</v-chip>
+                  <v-chip
+                    v-for="(ch, ci) in song.chord_chart" :key="ci"
+                    size="x-small" variant="flat"
+                    :class="chordQualityClass(ch)"
+                  >{{ ch }}</v-chip>
                 </div>
                 <!-- NNS chips -->
                 <div v-if="song.nns_chart?.length" class="d-flex flex-wrap" style="gap: 3px">
@@ -173,7 +177,7 @@
                     v-for="(nns, ni) in song.nns_chart" :key="ni"
                     size="x-small" variant="tonal"
                     :color="nns && nns !== '?' ? 'surface-variant' : 'error'"
-                    class="font-weight-medium"
+                    class="font-weight-medium chip-nns-style"
                   >{{ nns ?? '?' }}</v-chip>
                 </div>
               </template>
@@ -491,21 +495,19 @@
         class="flex-grow-1 d-flex flex-column align-center justify-center pa-6 text-center"
         style="max-width: 560px; margin: 0 auto; width: 100%"
       >
-        <div class="text-h6 lib-title mb-1">{{ singleDrillSong.title }}</div>
+        <div class="lib-drill-title mb-1">{{ singleDrillSong.title }}</div>
         <div v-if="singleDrillSong.artist" class="text-caption text-medium-emphasis mb-4">
           {{ singleDrillSong.artist }}
         </div>
 
         <!-- NNS Flash -->
         <template v-if="singleDrillType === 'nns'">
-          <div class="text-caption text-medium-emphasis mb-3">Recall the chords for this progression:</div>
-          <div class="d-flex flex-wrap justify-center mb-6" style="gap: 6px">
-            <v-chip v-for="(n, i) in singleDrillNNS" :key="i" color="primary" variant="tonal" size="small">
-              {{ n ?? '?' }}
-            </v-chip>
+          <div class="lib-drill-prompt mb-3">Recall the chords for this progression:</div>
+          <div class="d-flex flex-wrap justify-center mb-6" style="gap: 8px">
+            <span v-for="(n, i) in singleDrillNNS" :key="i" class="lib-nns-number">{{ n ?? '?' }}</span>
           </div>
           <v-expand-transition>
-            <div v-if="singleDrillReveal" class="w-100">
+            <div v-if="singleDrillReveal" class="w-100 drill-reveal-content">
               <div class="text-caption text-medium-emphasis mb-2">
                 Chords ({{ singleDrillSong.key }}):
               </div>
@@ -531,7 +533,7 @@
           </div>
           <div class="text-caption text-medium-emphasis mb-6">Work out the transposed chords…</div>
           <v-expand-transition>
-            <div v-if="singleDrillReveal" class="w-100">
+            <div v-if="singleDrillReveal" class="w-100 drill-reveal-content">
               <div class="text-caption text-medium-emphasis mb-2">
                 Transposed to {{ singleDrillTransposeKey }}:
               </div>
@@ -552,7 +554,7 @@
             <v-chip v-for="(ch, i) in singleDrillChords" :key="i" variant="outlined" size="small">{{ ch }}</v-chip>
           </div>
           <v-expand-transition>
-            <div v-if="singleDrillReveal" class="w-100">
+            <div v-if="singleDrillReveal" class="w-100 drill-reveal-content">
               <div class="text-caption text-medium-emphasis mb-2">
                 Key: <strong>{{ singleDrillSong.key }}</strong>
               </div>
@@ -575,7 +577,7 @@
           </div>
           <div class="text-caption text-medium-emphasis mb-3">Recall the chords for this section:</div>
           <v-expand-transition>
-            <div v-if="singleDrillReveal" class="w-100">
+            <div v-if="singleDrillReveal" class="w-100 drill-reveal-content">
               <div class="d-flex flex-wrap justify-center mb-6" style="gap: 6px">
                 <v-chip
                   v-for="(ch, i) in (singleDrillSectionsOrdered[singleDrillSectionIdx]?.chord_chart ?? [])"
@@ -598,7 +600,7 @@
           </div>
           <div class="text-caption text-medium-emphasis mb-6">Recall the chords for the next section:</div>
           <v-expand-transition>
-            <div v-if="singleDrillReveal" class="w-100">
+            <div v-if="singleDrillReveal" class="w-100 drill-reveal-content">
               <div class="d-flex flex-wrap justify-center mb-6" style="gap: 6px">
                 <v-chip
                   v-for="(ch, i) in (singleDrillSectionsOrdered[singleDrillSectionIdx]?.nextSection?.chord_chart ?? [])"
@@ -612,7 +614,8 @@
         <!-- Reveal button -->
         <v-btn
           v-if="!singleDrillReveal"
-          color="primary" variant="flat" size="large"
+          color="primary" variant="flat" block
+          style="min-height: 52px; font-size: 1rem; font-weight: 600; max-width: 400px"
           @click="revealSingleCard"
         >Reveal</v-btn>
 
@@ -621,31 +624,32 @@
           <template v-if="['form', 'section_flash', 'transition'].includes(singleDrillType)">
             <v-btn
               v-if="singleDrillSectionIdx < singleDrillSectionsOrdered.length - 1"
-              color="primary" variant="flat" size="large"
+              color="primary" variant="tonal" block
+              style="min-height: 52px; max-width: 400px"
               @click="advanceSingleSectionDrill"
             >
               Next ({{ singleDrillSectionIdx + 1 }}/{{ singleDrillSectionsOrdered.length }})
             </v-btn>
-            <div v-else class="d-flex justify-center flex-wrap" style="gap: 10px">
-              <v-btn color="success" variant="tonal" size="small" :loading="singleDrillSaving" @click="rateSingleDrill('got_it')">
+            <div v-else class="d-flex flex-column align-center w-100" style="gap: 10px; max-width: 400px">
+              <v-btn color="success" variant="flat" block :loading="singleDrillSaving" style="min-height:56px;font-size:1rem;font-weight:600" @click="rateSingleDrill('got_it')">
                 <v-icon start>mdi-check-circle-outline</v-icon>Got it
               </v-btn>
-              <v-btn color="warning" variant="tonal" size="small" :loading="singleDrillSaving" @click="rateSingleDrill('almost')">
+              <v-btn color="warning" variant="flat" block :loading="singleDrillSaving" style="min-height:56px;font-size:1rem;font-weight:600" @click="rateSingleDrill('almost')">
                 <v-icon start>mdi-minus-circle-outline</v-icon>Almost
               </v-btn>
-              <v-btn color="error" variant="tonal" size="small" :loading="singleDrillSaving" @click="rateSingleDrill('missed')">
+              <v-btn color="error" variant="flat" block :loading="singleDrillSaving" style="min-height:56px;font-size:1rem;font-weight:600" @click="rateSingleDrill('missed')">
                 <v-icon start>mdi-close-circle-outline</v-icon>Missed
               </v-btn>
             </div>
           </template>
-          <div v-else class="d-flex justify-center flex-wrap" style="gap: 10px">
-            <v-btn color="success" variant="tonal" size="small" :loading="singleDrillSaving" @click="rateSingleDrill('got_it')">
+          <div v-else class="d-flex flex-column align-center w-100" style="gap: 10px; max-width: 400px">
+            <v-btn color="success" variant="flat" block :loading="singleDrillSaving" style="min-height:56px;font-size:1rem;font-weight:600" @click="rateSingleDrill('got_it')">
               <v-icon start>mdi-check-circle-outline</v-icon>Got it
             </v-btn>
-            <v-btn color="warning" variant="tonal" size="small" :loading="singleDrillSaving" @click="rateSingleDrill('almost')">
+            <v-btn color="warning" variant="flat" block :loading="singleDrillSaving" style="min-height:56px;font-size:1rem;font-weight:600" @click="rateSingleDrill('almost')">
               <v-icon start>mdi-minus-circle-outline</v-icon>Almost
             </v-btn>
-            <v-btn color="error" variant="tonal" size="small" :loading="singleDrillSaving" @click="rateSingleDrill('missed')">
+            <v-btn color="error" variant="flat" block :loading="singleDrillSaving" style="min-height:56px;font-size:1rem;font-weight:600" @click="rateSingleDrill('missed')">
               <v-icon start>mdi-close-circle-outline</v-icon>Missed
             </v-btn>
           </div>
@@ -1294,6 +1298,13 @@ onBeforeRouteLeave(() => {
   singleDrillOpen.value = false
   authOpen.value        = false
 })
+
+function chordQualityClass(chord) {
+  if (!chord) return ''
+  if (chord.endsWith('dim')) return 'chip-dim'
+  if (chord.endsWith('m'))   return 'chip-minor'
+  return 'chip-major'
+}
 </script>
 
 <style scoped>
@@ -1308,6 +1319,29 @@ onBeforeRouteLeave(() => {
 }
 .lib-title {
   font-family: 'Space Grotesk', sans-serif;
+}
+.lib-drill-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #E8E8E0;
+  letter-spacing: -0.02em;
+}
+.lib-drill-prompt {
+  font-size: 2rem;
+  color: rgba(196,196,188,0.7);
+  font-weight: 500;
+}
+.lib-nns-number {
+  font-family: 'Space Grotesk', monospace;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #C8A96E;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  background: rgba(200,169,110,0.1);
+  border-radius: 10px;
+  padding: 8px 18px;
 }
 .section-label {
   font-family: 'Space Grotesk', sans-serif;
@@ -1331,8 +1365,13 @@ onBeforeRouteLeave(() => {
 }
 .song-title {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 0.95rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.lib-song-artist {
+  font-size: 0.85rem;
+  color: rgba(196,196,188,0.55);
+  margin-top: 1px;
 }
 
 /* ── Confidence dot ─────────────────────────────────────────────────────── */
@@ -1422,8 +1461,8 @@ onBeforeRouteLeave(() => {
   border-color: rgba(200, 169, 110, 0.35) !important;
 }
 .achievement-card:not(.achievement-card--unlocked) {
-  filter: grayscale(0.6);
-  opacity: 0.7;
+  filter: grayscale(1);
+  opacity: 0.4;
 }
 .achievement-icon-wrap {
   width: 56px;
