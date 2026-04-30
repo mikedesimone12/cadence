@@ -69,7 +69,7 @@
     </v-dialog>
 
     <!-- ── Key selector ──────────────────────────────────────────────────── -->
-    <div class="section-label mb-2">Key</div>
+    <div class="section-title">Key</div>
     <div class="key-scroll-row mb-3">
       <v-btn
         v-for="k in KEY_ROOTS" :key="k"
@@ -117,7 +117,7 @@
     </div>
 
     <!-- ── Progression builder ───────────────────────────────────────────── -->
-    <div class="section-label mb-2">Progression</div>
+    <div class="section-title">Progression</div>
 
     <!-- Section selector chips (shown when a multi-section song is loaded) -->
     <div v-if="loadedSongSections.length" class="d-flex flex-wrap mb-2" style="gap: 6px">
@@ -237,7 +237,7 @@
     </v-card>
 
     <!-- ── Chord pad ─────────────────────────────────────────────────────── -->
-    <div class="section-label mb-3">Diatonic Chords</div>
+    <div class="section-title">Diatonic Chords</div>
     <div class="chord-pad">
       <div
         v-for="item in displayChords" :key="item.chord"
@@ -264,7 +264,7 @@
     </div>
 
     <!-- ── Playback controls ─────────────────────────────────────────────── -->
-    <div class="section-label mt-5 mb-3">Playback</div>
+    <div class="section-title mt-5">Playback</div>
 
     <!-- BPM row -->
     <div class="d-flex align-center mb-3" style="gap: 10px">
@@ -834,18 +834,22 @@ onBeforeRouteLeave(() => {
 }
 .section-label {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 0.69rem;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(196, 196, 188, 0.5);
+  color: rgba(255, 255, 255, 0.5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 6px;
+  margin-bottom: 12px;
+  display: block;
 }
 .key-display-title {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 1.55rem;
   font-weight: 700;
   letter-spacing: -0.025em;
-  color: #C8A96E;
+  color: rgba(255, 255, 255, 0.90);
 }
 
 /* ── Key selector ───────────────────────────────────────────────────────── */
@@ -932,7 +936,9 @@ onBeforeRouteLeave(() => {
   min-height: 92px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.025);
+  border-left-width: 2px;
+  border-left-color: rgba(200, 169, 110, 0.45);
+  background: rgba(200, 169, 110, 0.08);
   cursor: pointer;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -941,20 +947,24 @@ onBeforeRouteLeave(() => {
 .chord-tile:active { transform: scale(0.93); }
 
 .chord-tile--tonic {
+  background: rgba(200, 169, 110, 0.18);
   border-color: rgba(200, 169, 110, 0.35);
-  background: rgba(200, 169, 110, 0.09);
+  border-left-color: #C8A96E;
 }
 .chord-tile--minor {
-  border-color: rgba(110, 142, 173, 0.3);
-  background: rgba(110, 142, 173, 0.05);
+  background: rgba(110, 142, 173, 0.12);
+  border-color: rgba(110, 142, 173, 0.18);
+  border-left-color: rgba(110, 142, 173, 0.65);
 }
 .chord-tile--dim {
-  border-color: rgba(207, 75, 75, 0.28);
-  background: rgba(207, 75, 75, 0.04);
+  background: rgba(232, 87, 42, 0.12);
+  border-color: rgba(232, 87, 42, 0.18);
+  border-left-color: rgba(232, 87, 42, 0.65);
 }
 .chord-tile--active {
   background: rgba(200, 169, 110, 0.22) !important;
   border-color: #C8A96E !important;
+  border-left-color: #C8A96E !important;
   box-shadow: 0 0 10px rgba(200,169,110,0.25);
 }
 

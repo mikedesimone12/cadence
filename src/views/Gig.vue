@@ -182,13 +182,15 @@
                           style="flex-shrink: 0; margin-top: 3px"
                         />
                       </div>
-                      <div v-if="song.key || song.bpm" class="d-flex flex-wrap mb-2" style="gap: 4px">
-                        <v-chip v-if="song.key" size="x-small" color="primary" variant="tonal">
-                          {{ song.key }}
-                        </v-chip>
-                        <v-chip v-if="song.bpm" size="x-small" variant="flat" class="chip-bpm">
-                          {{ song.bpm }} BPM
-                        </v-chip>
+                      <div v-if="song.key || song.bpm" class="d-flex mb-2" style="gap: 16px">
+                        <div v-if="song.key">
+                          <div class="data-label">Key</div>
+                          <v-chip size="x-small" color="primary" variant="tonal">{{ song.key }}</v-chip>
+                        </div>
+                        <div v-if="song.bpm">
+                          <div class="data-label">Tempo</div>
+                          <v-chip size="x-small" variant="flat" class="chip-bpm">{{ song.bpm }} BPM</v-chip>
+                        </div>
                       </div>
                       <!-- Full-form song: show sections -->
                       <template v-if="hasSections(song)">
@@ -205,34 +207,42 @@
                             <span class="section-nns">{{ n ?? '?' }}</span>
                           </template>
                         </div>
-                        <div v-if="hasFormOrder(song)" class="d-flex flex-wrap mt-1" style="gap: 6px">
-                          <span class="text-caption text-medium-emphasis mr-1" style="font-size:0.6rem; line-height:28px">Form:</span>
-                          <v-chip
-                            v-for="(name, fi) in song.form_order" :key="fi"
-                            size="small" variant="flat" class="chip-section"
-                            style="min-height: 28px"
-                          >{{ abbrevSection(name) }}</v-chip>
+                        <div v-if="hasFormOrder(song)" class="mt-2">
+                          <div class="data-label mb-1">Form</div>
+                          <div class="d-flex flex-wrap" style="gap: 6px">
+                            <v-chip
+                              v-for="(name, fi) in song.form_order" :key="fi"
+                              size="small" variant="flat" class="chip-section"
+                              style="min-height: 28px"
+                            >{{ abbrevSection(name) }}</v-chip>
+                          </div>
                         </div>
                       </template>
-                      <!-- Simple song: existing flat chord/NNS chips -->
+                      <!-- Simple song: chord/NNS chips with whisper labels -->
                       <template v-else>
-                        <div v-if="parsedChords(song).length" class="d-flex flex-wrap mb-1" style="gap: 4px">
-                          <v-chip
-                            v-for="(chord, ci) in parsedChords(song)"
-                            :key="ci"
-                            size="x-small" variant="flat"
-                            :class="chordQualityClass(chord)"
-                          >{{ chord }}</v-chip>
-                        </div>
-                        <div v-if="songNNS(song).length" class="d-flex flex-wrap" style="gap: 4px">
-                          <v-chip
-                            v-for="(nns, ni) in songNNS(song)"
-                            :key="ni"
-                            size="x-small" variant="tonal"
-                            :color="nns ? 'surface-variant' : 'error'"
-                            class="font-weight-medium chip-nns-style"
-                          >{{ nns ?? '?' }}</v-chip>
-                        </div>
+                        <template v-if="parsedChords(song).length">
+                          <div class="data-label">Chords</div>
+                          <div class="d-flex flex-wrap mb-2" style="gap: 4px">
+                            <v-chip
+                              v-for="(chord, ci) in parsedChords(song)"
+                              :key="ci"
+                              size="x-small" variant="flat"
+                              :class="chordQualityClass(chord)"
+                            >{{ chord }}</v-chip>
+                          </div>
+                        </template>
+                        <template v-if="songNNS(song).length">
+                          <div class="data-label">NNS</div>
+                          <div class="d-flex flex-wrap" style="gap: 4px">
+                            <v-chip
+                              v-for="(nns, ni) in songNNS(song)"
+                              :key="ni"
+                              size="x-small" variant="tonal"
+                              :color="nns ? 'surface-variant' : 'error'"
+                              class="font-weight-medium chip-nns-style"
+                            >{{ nns ?? '?' }}</v-chip>
+                          </div>
+                        </template>
                       </template>
                       <!-- Transpose panel -->
                       <div class="mt-2">

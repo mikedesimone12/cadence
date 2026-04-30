@@ -42,13 +42,13 @@
 
     <!-- Loading skeletons (first load only) -->
     <div v-if="isLoading && !songs.length">
-      <div class="section-label mb-3">Saved Songs</div>
+      <div class="section-title">Saved Songs</div>
       <v-row class="mb-4">
         <v-col v-for="i in 4" :key="i" cols="12" md="6">
           <v-skeleton-loader type="card" />
         </v-col>
       </v-row>
-      <div class="section-label mt-4 mb-3">Practice Stats</div>
+      <div class="section-title mt-4">Practice Stats</div>
       <v-row>
         <v-col v-for="i in 4" :key="i" cols="6" sm="3">
           <v-skeleton-loader type="heading,text" class="pa-3" style="min-height: 80px" />
@@ -61,7 +61,7 @@
       <!-- ════════════════════════════════════════════════════════════════════
            SECTION 1 — SAVED SONGS
            ════════════════════════════════════════════════════════════════════ -->
-      <div class="section-label mb-3">Saved Songs</div>
+      <div class="section-title">Saved Songs</div>
 
       <!-- Search -->
       <v-text-field
@@ -130,11 +130,20 @@
                 </div>
               </div>
 
-              <!-- Badges -->
-              <div class="d-flex flex-wrap mb-2" style="gap: 4px">
-                <v-chip v-if="song.key" size="x-small" color="primary" variant="tonal">{{ song.key }}</v-chip>
-                <v-chip v-if="song.bpm" size="x-small" variant="flat" class="chip-bpm">{{ song.bpm }} BPM</v-chip>
-                <v-chip                 size="x-small" color="surface-variant" variant="tonal" class="text-caption" style="opacity:.6">
+              <!-- Key + Tempo with labels -->
+              <div v-if="song.key || song.bpm" class="d-flex mb-2" style="gap: 16px">
+                <div v-if="song.key">
+                  <div class="data-label">Key</div>
+                  <v-chip size="x-small" color="primary" variant="tonal">{{ song.key }}</v-chip>
+                </div>
+                <div v-if="song.bpm">
+                  <div class="data-label">Tempo</div>
+                  <v-chip size="x-small" variant="flat" class="chip-bpm">{{ song.bpm }} BPM</v-chip>
+                </div>
+              </div>
+              <!-- Date -->
+              <div class="mb-2">
+                <v-chip size="x-small" color="surface-variant" variant="tonal" class="text-caption" style="opacity:.5">
                   {{ formatDate(song.created_at) }}
                 </v-chip>
               </div>
@@ -156,30 +165,39 @@
                     <span class="section-nns">{{ n ?? '?' }}</span>
                   </template>
                 </div>
-                <div v-if="hasFormOrder(song)" class="d-flex flex-wrap mt-1" style="gap: 6px">
-                  <v-chip v-for="(name, fi) in song.form_order" :key="fi" size="small" variant="flat" class="chip-section" style="min-height: 28px">
-                    {{ abbrevSection(name) }}
-                  </v-chip>
+                <div v-if="hasFormOrder(song)" class="mt-2">
+                  <div class="data-label mb-1">Form</div>
+                  <div class="d-flex flex-wrap" style="gap: 6px">
+                    <v-chip v-for="(name, fi) in song.form_order" :key="fi" size="small" variant="flat" class="chip-section" style="min-height: 28px">
+                      {{ abbrevSection(name) }}
+                    </v-chip>
+                  </div>
                 </div>
               </template>
               <template v-else>
-                <!-- Chord chips -->
-                <div v-if="song.chord_chart?.length" class="d-flex flex-wrap mb-1" style="gap: 3px">
-                  <v-chip
-                    v-for="(ch, ci) in song.chord_chart" :key="ci"
-                    size="x-small" variant="flat"
-                    :class="chordQualityClass(ch)"
-                  >{{ ch }}</v-chip>
-                </div>
-                <!-- NNS chips -->
-                <div v-if="song.nns_chart?.length" class="d-flex flex-wrap" style="gap: 3px">
-                  <v-chip
-                    v-for="(nns, ni) in song.nns_chart" :key="ni"
-                    size="x-small" variant="tonal"
-                    :color="nns && nns !== '?' ? 'surface-variant' : 'error'"
-                    class="font-weight-medium chip-nns-style"
-                  >{{ nns ?? '?' }}</v-chip>
-                </div>
+                <!-- Chord chips with label -->
+                <template v-if="song.chord_chart?.length">
+                  <div class="data-label">Chords</div>
+                  <div class="d-flex flex-wrap mb-2" style="gap: 3px">
+                    <v-chip
+                      v-for="(ch, ci) in song.chord_chart" :key="ci"
+                      size="x-small" variant="flat"
+                      :class="chordQualityClass(ch)"
+                    >{{ ch }}</v-chip>
+                  </div>
+                </template>
+                <!-- NNS chips with label -->
+                <template v-if="song.nns_chart?.length">
+                  <div class="data-label">NNS</div>
+                  <div class="d-flex flex-wrap" style="gap: 3px">
+                    <v-chip
+                      v-for="(nns, ni) in song.nns_chart" :key="ni"
+                      size="x-small" variant="tonal"
+                      :color="nns && nns !== '?' ? 'surface-variant' : 'error'"
+                      class="font-weight-medium chip-nns-style"
+                    >{{ nns ?? '?' }}</v-chip>
+                  </div>
+                </template>
               </template>
 
               <!-- Expanded section — click.stop so card doesn't re-toggle -->
@@ -187,7 +205,10 @@
                 <div v-if="expandedSongId === song.id" @click.stop>
 
                   <!-- Notes -->
-                  <div v-if="song.notes" class="notes-box text-body-2 mt-3">{{ song.notes }}</div>
+                  <div v-if="song.notes" class="mt-3">
+                    <div class="data-label mb-1">Notes</div>
+                    <div class="notes-box text-body-2">{{ song.notes }}</div>
+                  </div>
 
                   <!-- Transpose toggle -->
                   <div class="mt-3">
@@ -276,7 +297,7 @@
       <!-- ════════════════════════════════════════════════════════════════════
            SECTION 2 — PRACTICE STATS
            ════════════════════════════════════════════════════════════════════ -->
-      <div class="section-label mt-7 mb-3">Practice Stats</div>
+      <div class="section-title mt-7">Practice Stats</div>
 
       <v-row class="mb-4">
         <v-col v-for="s in statCards" :key="s.label" cols="6" sm="3">
@@ -357,7 +378,7 @@
       <!-- ════════════════════════════════════════════════════════════════════
            SECTION 3 — RECENT ACTIVITY
            ════════════════════════════════════════════════════════════════════ -->
-      <div class="section-label mt-7 mb-3">Recent Activity</div>
+      <div class="section-title mt-7">Recent Activity</div>
 
       <v-card>
         <div v-if="!recentActivity.length" class="text-center text-medium-emphasis pa-6">
@@ -391,7 +412,7 @@
       <!-- ════════════════════════════════════════════════════════════════════
            SECTION 4 — ACHIEVEMENTS
            ════════════════════════════════════════════════════════════════════ -->
-      <div class="section-label mt-7 mb-3">Achievements</div>
+      <div class="section-title mt-7">Achievements</div>
 
       <v-row>
         <v-col
@@ -1345,11 +1366,15 @@ function chordQualityClass(chord) {
 }
 .section-label {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 0.69rem;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(196, 196, 188, 0.5);
+  color: rgba(255, 255, 255, 0.5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 6px;
+  margin-bottom: 12px;
+  display: block;
 }
 
 /* ── Song card ──────────────────────────────────────────────────────────── */

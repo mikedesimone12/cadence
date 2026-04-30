@@ -75,7 +75,7 @@
     </v-dialog>
 
     <!-- ── Step 1: Progression row ───────────────────────────────────────── -->
-    <div class="section-label mb-2">Your Progression</div>
+    <div class="section-title">Your Progression</div>
 
     <v-card
       class="mb-4 progression-card"
@@ -153,7 +153,7 @@
     </v-card>
 
     <!-- ── Step 2: Chord grid ────────────────────────────────────────────── -->
-    <div class="section-label mb-2">Pick Chords</div>
+    <div class="section-title">Pick Chords</div>
 
     <v-card class="mb-4">
       <v-card-text class="pb-2">
@@ -747,18 +747,25 @@ onBeforeRouteLeave(() => {
 }
 .section-label {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 0.69rem;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(196, 196, 188, 0.5);
+  color: rgba(255, 255, 255, 0.5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 6px;
+  margin-bottom: 12px;
+  display: block;
 }
 .group-label {
-  font-size: 0.68rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(110, 142, 173, 0.8);
+  color: rgba(255, 255, 255, 0.5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 6px;
+  display: block;
 }
 .key-title {
   font-family: 'Space Grotesk', sans-serif;
@@ -823,9 +830,10 @@ onBeforeRouteLeave(() => {
 .chord-btn:active {
   transform: scale(0.95) !important;
 }
-/* selected chord button glow */
+/* selected chord button: dark text on gold, stronger glow */
 .v-btn.chord-btn.v-btn--variant-flat {
-  box-shadow: 0 0 12px rgba(200,169,110,0.4) !important;
+  color: #0D0D0F !important;
+  box-shadow: 0 0 16px rgba(200,169,110,0.5) !important;
 }
 
 /* ── Diatonic chord row in key card ─────────────────────────────────────── */
