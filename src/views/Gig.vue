@@ -363,7 +363,7 @@
 
   <!-- Drill fullscreen overlay -->
   <v-dialog v-model="drillOpen" fullscreen transition="dialog-bottom-transition">
-    <v-card style="min-height: 100vh; display: flex; flex-direction: column" class="bg-background">
+    <v-card style="min-height: 100vh; display: flex; flex-direction: column; background: #1A1A1F" class="no-hover">
       <v-toolbar density="compact" color="surface" border="b">
         <v-btn icon size="small" @click="drillOpen = false">
           <v-icon>mdi-close</v-icon>
@@ -461,11 +461,20 @@
               <div class="text-caption text-medium-emphasis mb-2">
                 Chords ({{ drillCurrentSong.key }}):
               </div>
-              <div class="d-flex flex-wrap justify-center mb-6" style="gap: 6px">
-                <v-chip v-for="(ch, i) in drillChords" :key="i" color="secondary" variant="tonal" size="small">
-                  {{ ch }}
-                </v-chip>
+              <div class="d-flex flex-wrap justify-center mb-4" style="gap: 6px">
+                <v-chip
+                  v-for="(ch, i) in drillChords" :key="i"
+                  color="secondary" variant="tonal" size="small"
+                  style="cursor: pointer"
+                  :class="{ 'chip-viz-active': drillVizChord === ch }"
+                  @click="drillVizChord = drillVizChord === ch ? null : ch"
+                >{{ ch }}</v-chip>
               </div>
+              <v-expand-transition>
+                <div v-if="showFingering && drillVizChord" class="mb-4">
+                  <ChordVisualizer :chord-name="drillVizChord" :compact="true" />
+                </div>
+              </v-expand-transition>
             </div>
           </v-expand-transition>
         </template>
@@ -894,6 +903,7 @@ import { supabase } from '../lib/supabase'
 import { progressionToNNS, noteToSharp, musicalKeys, transposeProgression, getCapoSuggestion, transposeSections } from '../core/musicTheory'
 import { useAudio } from '../composables/useAudio'
 import AuthModal from '../components/AuthModal.vue'
+import ChordVisualizer from '../components/ChordVisualizer.vue'
 
 defineOptions({ name: 'GigView' })
 
@@ -1515,6 +1525,9 @@ const DRILL_TYPES = [
   },
 ]
 
+const showFingering = ref(localStorage.getItem('cadence_show_fingering') !== 'false')
+const drillVizChord = ref(null)
+
 const drillOpen               = ref(false)
 const drillSetlist             = ref(null)
 const drillType                = ref(null)
@@ -1741,6 +1754,7 @@ async function rateCurrentSong(rating) {
   } else {
     drillQueueIdx.value = nextIdx
     drillCardPhase.value = 'question'
+    drillVizChord.value = null
     pickTransposeKey()
     initSectionDrill(newQueue[nextIdx])
   }

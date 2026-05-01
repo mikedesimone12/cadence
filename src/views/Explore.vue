@@ -65,7 +65,8 @@
               <v-icon size="16" color="medium-emphasis">mdi-volume-high</v-icon>
             </div>
           </template>
-          <v-switch v-model="isShowingTips" label="Show chord tones on hover" hide-details color="primary" />
+          <v-switch v-model="isShowingTips"   label="Show chord tones on hover" hide-details color="primary" />
+          <v-switch v-model="showFingering"   label="Show chord fingering"      hide-details color="primary" />
         </v-card-text>
         <v-card-actions>
           <v-spacer />
@@ -106,6 +107,8 @@
                 :color="chipColor(chord)"
                 variant="tonal" size="default"
                 class="prog-chip"
+                :class="{ 'prog-chip--viz': showFingering && progVizChord === chord }"
+                @click.stop="toggleProgVizChord(chord)"
               >
                 <v-icon start size="12" style="opacity:0.45">mdi-drag-vertical</v-icon>
                 {{ toDisplay(chord) }}
@@ -147,6 +150,19 @@
               </v-btn>
             </div>
           </div>
+
+          <!-- Progression chord visualizer (chip-click driven) -->
+          <v-expand-transition>
+            <div v-if="showFingering && progVizChord" class="mt-3">
+              <div class="d-flex align-center justify-space-between mb-2">
+                <span class="text-caption text-medium-emphasis">Fingering</span>
+                <v-btn icon size="x-small" variant="text" @click="progVizChord = null">
+                  <v-icon size="14">mdi-close</v-icon>
+                </v-btn>
+              </div>
+              <ChordVisualizer :chord-name="progVizChord" :compact="false" />
+            </div>
+          </v-expand-transition>
         </div>
 
       </v-card-text>
@@ -167,8 +183,8 @@
               <template #activator="{ props }">
                 <v-btn
                   v-bind="props"
-                  :color="isSelected(c.sharp) ? 'primary' : undefined"
-                  :variant="isSelected(c.sharp) ? 'flat' : 'outlined'"
+                  :color="isSelected(c.sharp) ? 'primary' : (showFingering && vizChord === c.sharp ? 'secondary' : undefined)"
+                  :variant="isSelected(c.sharp) ? 'flat' : (showFingering && vizChord === c.sharp ? 'tonal' : 'outlined')"
                   size="small" class="chord-btn"
                   @click="handleChordClick(c.sharp)"
                 >{{ c.display }}</v-btn>
@@ -179,6 +195,21 @@
         </div>
       </v-card-text>
     </v-card>
+
+    <!-- ── Chord fingering (grid click) ─────────────────────────────────── -->
+    <v-expand-transition>
+      <div v-if="showFingering && vizChord" class="mb-4">
+        <v-card color="surface" class="pa-4 no-hover">
+          <div class="d-flex align-center justify-space-between mb-2">
+            <span class="text-caption text-medium-emphasis">Fingering — {{ vizChord }}</span>
+            <v-btn icon size="x-small" variant="text" @click="vizChord = null">
+              <v-icon size="14">mdi-close</v-icon>
+            </v-btn>
+          </div>
+          <ChordVisualizer :chord-name="vizChord" :compact="false" />
+        </v-card>
+      </div>
+    </v-expand-transition>
 
     <!-- ── Step 3: Key analysis (unlocks on first chord) ────────────────── -->
     <v-expand-transition>
@@ -432,6 +463,7 @@ import { musicalKeys, noteToSharp, checkKeys, chordToNNS, progressionToNNS } fro
 import { useAudio } from '../composables/useAudio'
 import { useAuth } from '../composables/useAuth'
 import { supabase } from '../lib/supabase'
+import ChordVisualizer from '../components/ChordVisualizer.vue'
 
 defineOptions({ name: 'ExploreView' })
 
@@ -450,6 +482,23 @@ const sharpsOrFlats        = ref('sharps')
 const isAudible            = ref(true)
 const isShowingTips        = ref(true)
 const settingsOpen         = ref(false)
+
+// ─── Chord fingering visualizer ───────────────────────────────────────────────
+
+const showFingering = ref(localStorage.getItem('cadence_show_fingering') !== 'false')
+watch(showFingering, v => localStorage.setItem('cadence_show_fingering', String(v)))
+
+// Grid chord viz: shown below the chord grid section
+const vizChord = ref(null)
+function toggleVizChord(chord) {
+  vizChord.value = vizChord.value === chord ? null : chord
+}
+
+// Progression chip viz: shown inside the progression card
+const progVizChord = ref(null)
+function toggleProgVizChord(chord) {
+  progVizChord.value = progVizChord.value === chord ? null : chord
+}
 const showAllKeys          = ref(false)
 const isExplaining         = ref(false)
 const explanationText      = ref('')
@@ -582,6 +631,7 @@ function handleChordClick(chordSharp) {
     selectedChordsSharp.value.push(chordSharp)
     if (isAudible.value) playChord(chordSharp)
   }
+  if (showFingering.value) toggleVizChord(chordSharp)
 }
 function removeChord(chordSharp) {
   const idx = selectedChordsSharp.value.indexOf(chordSharp)

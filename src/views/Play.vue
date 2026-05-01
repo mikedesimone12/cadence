@@ -60,6 +60,7 @@
               <v-icon size="16" color="medium-emphasis">mdi-volume-high</v-icon>
             </div>
           </template>
+          <v-switch v-model="showFingering" label="Show chord fingering" hide-details color="primary" class="mt-1" />
         </v-card-text>
         <v-card-actions>
           <v-spacer />
@@ -255,6 +256,13 @@
       </div>
     </div>
 
+    <!-- ── Chord fingering ──────────────────────────────────────────────── -->
+    <v-expand-transition>
+      <div v-if="showFingering && fingeringChord" class="mt-3 mb-1">
+        <ChordVisualizer :chord-name="fingeringChord" :compact="false" />
+      </div>
+    </v-expand-transition>
+
     <!-- ── Capo suggestion ───────────────────────────────────────────────── -->
     <div v-if="capoSuggestion" class="d-flex align-center mt-2 mb-1 capo-row">
       <v-icon size="13" color="medium-emphasis" class="mr-1">mdi-guitar-electric</v-icon>
@@ -377,6 +385,7 @@ import { musicalKeys, noteToSharp, getCapoSuggestion, chordToNNS, progressionToN
 import { useAudio } from '../composables/useAudio'
 import { useAuth } from '../composables/useAuth'
 import { supabase } from '../lib/supabase'
+import ChordVisualizer from '../components/ChordVisualizer.vue'
 
 defineOptions({ name: 'PlayView' })
 
@@ -416,6 +425,12 @@ const sharpsOrFlats = ref('sharps')
 const isAudible     = ref(true)
 const settingsOpen  = ref(false)
 const activeChord   = ref(null)
+
+// ─── Chord fingering visualizer ───────────────────────────────────────────────
+
+const showFingering = ref(localStorage.getItem('cadence_show_fingering') !== 'false')
+watch(showFingering, v => localStorage.setItem('cadence_show_fingering', String(v)))
+const fingeringChord = ref(null)
 
 let flashTimer = null
 
@@ -458,10 +473,12 @@ const {
 } = useAudio()
 
 onMounted(() => {
+  fingeringChord.value = null
   if (isAudible.value) loadInstruments()
   applyHistoryState()
 })
 onActivated(() => {
+  fingeringChord.value = null
   if (isAudible.value && !isLoaded.value) loadInstruments()
   applyHistoryState()
 })
@@ -541,6 +558,7 @@ async function handleChordTap(chord) {
     activeChord.value = chord
     flashTimer = setTimeout(() => { activeChord.value = null }, 500)
   }
+  fingeringChord.value = chord
 }
 
 async function handlePlayScale() {
@@ -766,8 +784,10 @@ async function startPlayback() {
       barProgress.value = cfg.stepsPerBar > 1
         ? Math.round(step / cfg.stepsPerBar * 100)
         : 0
-      // Update chord tile highlight on each chord change
-      if (step === 0) activeChord.value = chord
+      if (step === 0) {
+        activeChord.value   = chord
+        fingeringChord.value = chord
+      }
     }, time)
   }, cfg.interval)
 
@@ -778,12 +798,13 @@ function stopPlayback() {
   const transport = Tone.getTransport()
   transport.stop()
   transport.cancel()
-  _scheduleId     = null
-  _progIdx        = 0
-  _step           = 0
-  isPlaying.value = false
+  _scheduleId      = null
+  _progIdx         = 0
+  _step            = 0
+  isPlaying.value  = false
   barProgress.value = 0
   activeChord.value = null
+  fingeringChord.value = null
   currentPlayingIdx.value = 0
 }
 
