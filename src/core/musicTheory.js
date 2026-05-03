@@ -229,3 +229,205 @@ export function transposeSections(sections, fromKey, toKey) {
     return { ...section, chord_chart: transposedChords, nns_chart: nnsChart }
   })
 }
+
+// ── Common Progressions ───────────────────────────────────────────────────────
+
+export const COMMON_PROGRESSIONS = {
+  'Pop/Rock': [
+    {
+      name: 'Axis of Awesome',
+      nns: ['I','V','vi','IV'],
+      degrees: [0,4,5,3],
+      description: 'Used in hundreds of pop songs worldwide',
+      examples: [
+        { title: 'Let It Be', artist: 'The Beatles' },
+        { title: 'No Woman No Cry', artist: 'Bob Marley' },
+        { title: 'With or Without You', artist: 'U2' },
+      ],
+    },
+    {
+      name: 'Classic Rock',
+      nns: ['I','IV','V'],
+      degrees: [0,3,4],
+      description: 'The foundation of blues and rock',
+      examples: [
+        { title: 'La Bamba', artist: 'Ritchie Valens' },
+        { title: 'Johnny B. Goode', artist: 'Chuck Berry' },
+        { title: 'Twist and Shout', artist: 'The Beatles' },
+      ],
+    },
+    {
+      name: '50s Progression',
+      nns: ['I','vi','IV','V'],
+      degrees: [0,5,3,4],
+      description: 'Defined the doo-wop and early rock era',
+      examples: [
+        { title: 'Stand By Me', artist: 'Ben E. King' },
+        { title: 'Earth Angel', artist: 'The Penguins' },
+        { title: 'Every Breath You Take', artist: 'The Police' },
+      ],
+    },
+    {
+      name: 'Emotional Pop',
+      nns: ['vi','IV','I','V'],
+      degrees: [5,3,0,4],
+      description: 'Minor start gives an emotional, urgent feel',
+      examples: [
+        { title: 'Someone Like You', artist: 'Adele' },
+        { title: 'Demons', artist: 'Imagine Dragons' },
+        { title: 'Africa', artist: 'Toto' },
+      ],
+    },
+    {
+      name: 'Royal Road',
+      nns: ['I','V','vi','iii','IV'],
+      degrees: [0,4,5,2,3],
+      description: 'A Japanese music theory staple, widely used in pop',
+      examples: [
+        { title: "Don't Look Back in Anger", artist: 'Oasis' },
+        { title: 'Creep', artist: 'Radiohead' },
+        { title: 'Canon in D', artist: 'Pachelbel' },
+      ],
+    },
+  ],
+  'Jazz': [
+    {
+      name: 'ii–V–I',
+      nns: ['ii','V','I'],
+      degrees: [1,4,0],
+      description: 'The most fundamental jazz progression',
+      examples: [
+        { title: 'Autumn Leaves', artist: 'Jazz Standard' },
+        { title: 'All The Things You Are', artist: 'Jazz Standard' },
+        { title: 'Fly Me To The Moon', artist: 'Frank Sinatra' },
+      ],
+    },
+    {
+      name: 'Jazz Turnaround',
+      nns: ['I','VI','ii','V'],
+      degrees: [0,5,1,4],
+      description: 'Returns the ear to the tonic — used to loop songs',
+      examples: [
+        { title: 'I Got Rhythm', artist: 'Gershwin' },
+        { title: 'Blue Moon', artist: 'Jazz Standard' },
+        { title: 'Heart and Soul', artist: 'Jazz Standard' },
+      ],
+    },
+    {
+      name: 'Extended Turnaround',
+      nns: ['iii','VI','ii','V'],
+      degrees: [2,5,1,4],
+      description: 'Starts a step higher for more harmonic tension',
+      examples: [
+        { title: 'Rhythm Changes', artist: 'Jazz Standard' },
+        { title: 'Oleo', artist: 'Sonny Rollins' },
+        { title: 'Anthropology', artist: 'Charlie Parker' },
+      ],
+    },
+    {
+      name: '12-Bar Blues',
+      nns: ['I','I','I','I','IV','IV','I','I','V','IV','I','V'],
+      degrees: [0,0,0,0,3,3,0,0,4,3,0,4],
+      description: 'The backbone of blues, jazz, and rock and roll',
+      examples: [
+        { title: 'Sweet Home Chicago', artist: 'Robert Johnson' },
+        { title: 'Pride and Joy', artist: 'Stevie Ray Vaughan' },
+        { title: 'Johnny B. Goode', artist: 'Chuck Berry' },
+      ],
+    },
+  ],
+  'Classical/Folk': [
+    {
+      name: 'Perfect Cadence',
+      nns: ['I','IV','V','I'],
+      degrees: [0,3,4,0],
+      description: 'The most resolved, final-sounding progression',
+      examples: [
+        { title: 'Ode to Joy', artist: 'Beethoven' },
+        { title: 'Happy Birthday', artist: 'Traditional' },
+        { title: 'Twinkle Twinkle', artist: 'Traditional' },
+      ],
+    },
+    {
+      name: 'Pachelbel Canon',
+      nns: ['I','V','vi','iii','IV','I','IV','V'],
+      degrees: [0,4,5,2,3,0,3,4],
+      description: 'One of the most recognizable loops in Western music',
+      examples: [
+        { title: 'Canon in D', artist: 'Pachelbel' },
+        { title: 'Go West', artist: 'Pet Shop Boys' },
+        { title: 'Basket Case', artist: 'Green Day' },
+      ],
+    },
+    {
+      name: 'Andalusian Cadence',
+      nns: ['i','VII','VI','V'],
+      degrees: [0,6,5,4],
+      minor: true,
+      description: 'Flamenco and rock staple — descending minor feel',
+      examples: [
+        { title: 'Hit the Road Jack', artist: 'Ray Charles' },
+        { title: 'Stairway to Heaven', artist: 'Led Zeppelin' },
+        { title: 'White Rabbit', artist: 'Jefferson Airplane' },
+      ],
+    },
+    {
+      name: 'Folk Staple',
+      nns: ['I','V','vi','IV'],
+      degrees: [0,4,5,3],
+      description: 'Warm and singable — country and folk standard',
+      examples: [
+        { title: 'Wagon Wheel', artist: 'Old Crow Medicine Show' },
+        { title: 'Take Me Home Country Roads', artist: 'John Denver' },
+        { title: "Free Fallin'", artist: 'Tom Petty' },
+      ],
+    },
+  ],
+  'Soul/R&B': [
+    {
+      name: 'Soul Movement',
+      nns: ['I','iii','IV','V'],
+      degrees: [0,2,3,4],
+      description: 'Warm mediant gives classic soul character',
+      examples: [
+        { title: 'My Girl', artist: 'The Temptations' },
+        { title: 'Superstition', artist: 'Stevie Wonder' },
+        { title: 'September', artist: 'Earth Wind & Fire' },
+      ],
+    },
+    {
+      name: 'Jazz-Soul',
+      nns: ['ii','V','I','VI'],
+      degrees: [1,4,0,5],
+      description: 'Jazz sophistication meets soul groove',
+      examples: [
+        { title: "Isn't She Lovely", artist: 'Stevie Wonder' },
+        { title: 'Just the Two of Us', artist: 'Grover Washington Jr.' },
+        { title: 'Mercy Mercy Me', artist: 'Marvin Gaye' },
+      ],
+    },
+    {
+      name: 'Minor Soul',
+      nns: ['i','iv','VII','III'],
+      degrees: [0,3,6,2],
+      minor: true,
+      description: 'Dark and emotional — neo-soul and classic R&B',
+      examples: [
+        { title: "Ain't No Sunshine", artist: 'Bill Withers' },
+        { title: 'Killing Me Softly', artist: 'Fugees' },
+        { title: 'I Put a Spell on You', artist: 'Nina Simone' },
+      ],
+    },
+    {
+      name: 'Neo-Soul',
+      nns: ['I','iii','vi','IV'],
+      degrees: [0,2,5,3],
+      description: 'Lush and sophisticated — modern R&B feel',
+      examples: [
+        { title: 'Come Away With Me', artist: 'Norah Jones' },
+        { title: 'On & On', artist: 'Erykah Badu' },
+        { title: 'Butterflies', artist: 'Michael Jackson' },
+      ],
+    },
+  ],
+}

@@ -327,67 +327,14 @@
           <v-icon :icon="showAllKeys ? 'mdi-chevron-up' : 'mdi-chevron-down'" end />
         </v-btn>
 
-        <!-- ── Step 4: Ask Claude (unlocks when a key is found) ─────────── -->
+        <!-- ── Step 4: Ask Claude — disabled for now ──────────────────────
         <v-expand-transition>
           <div v-if="keyPairs.length > 0">
             <v-divider class="mb-4" />
-
-            <!-- Idle state: just the button -->
-            <div v-if="!explanationText && !isExplaining && !explanationError">
-              <v-btn
-                color="accent" variant="flat"
-                prepend-icon="mdi-lightbulb-on-outline"
-                block
-                style="font-size: 1rem; font-weight: 600; min-height: 48px;"
-                @click="explain()"
-              >
-                Explain this to me
-              </v-btn>
-            </div>
-
-            <!-- Loading: waveform -->
-            <div v-if="isExplaining" class="d-flex align-center justify-center py-5">
-              <div class="waveform">
-                <span v-for="n in 5" :key="n" class="waveform-bar" />
-              </div>
-              <span class="text-body-2 text-medium-emphasis ml-3">Listening...</span>
-            </div>
-
-            <!-- Error -->
-            <v-alert
-              v-if="explanationError"
-              type="error" variant="tonal" closable class="mb-3"
-              @click:close="explanationError = ''"
-            >{{ explanationError }}</v-alert>
-
-            <!-- Response -->
-            <div v-if="explanationText">
-              <v-card class="explanation-card mb-3">
-                <v-card-text>
-                  <div class="d-flex align-start gap-3">
-                    <v-icon color="primary" size="18" class="mt-1 flex-shrink-0">mdi-music</v-icon>
-                    <p class="text-body-1 mb-0" style="line-height:1.75; white-space:pre-wrap;">{{ explanationText }}</p>
-                  </div>
-                </v-card-text>
-                <v-card-actions class="pt-0">
-                  <v-btn
-                    variant="text" size="small" color="secondary"
-                    prepend-icon="mdi-refresh"
-                    :loading="isExplaining"
-                    @click="explainDifferently"
-                  >Explain differently</v-btn>
-                  <v-spacer />
-                  <v-btn
-                    variant="text" size="x-small" color="secondary"
-                    @click="explain()"
-                    :loading="isExplaining"
-                  >Ask again</v-btn>
-                </v-card-actions>
-              </v-card>
-            </div>
-
+            ... explain / explainDifferently UI ...
           </div>
         </v-expand-transition>
+        ─────────────────────────────────────────────────────────────────── -->
 
       </div>
     </v-expand-transition>
@@ -436,18 +383,134 @@
       </v-card>
     </v-dialog>
 
-    <!-- ── Reference: simplify complex chords ────────────────────────────── -->
-    <v-expansion-panels variant="accordion" class="mt-4">
+    <!-- ── Common Progressions ───────────────────────────────────────────── -->
+    <div
+      class="d-flex align-center mb-2 mt-4"
+      style="cursor:pointer; user-select:none"
+      @click="progSectionOpen = !progSectionOpen"
+    >
+      <div class="section-title flex-1-1" style="margin-bottom:0">Common Progressions</div>
+      <v-icon
+        :icon="progSectionOpen ? 'mdi-chevron-up' : 'mdi-chevron-down'"
+        size="18" color="medium-emphasis" class="ml-2"
+      />
+    </div>
+
+    <v-expand-transition>
+      <div v-if="progSectionOpen" class="mb-5">
+
+        <!-- Key state -->
+        <v-card variant="outlined" class="mb-3 prog-key-card">
+          <v-card-text class="py-3 px-4">
+
+            <!-- Detected key banner -->
+            <template v-if="usingDetectedKey">
+              <div class="d-flex align-center">
+                <v-icon size="14" color="success" class="mr-1">mdi-key-variant</v-icon>
+                <span class="text-body-2">
+                  Using detected key:&nbsp;<strong>{{ toDisplayNote(detectedKey) }} Major</strong>
+                </span>
+                <v-btn
+                  size="x-small" variant="text" color="secondary" class="ml-2"
+                  @click="onSwapProgKey"
+                >change</v-btn>
+              </div>
+            </template>
+
+            <!-- Key selector -->
+            <template v-else>
+              <div class="text-caption text-medium-emphasis mb-2">Pick a key to get started</div>
+              <div class="prog-key-scroll mb-3">
+                <v-btn
+                  v-for="note in PROG_NOTES"
+                  :key="note"
+                  :color="selectedProgKey === note ? 'primary' : undefined"
+                  :variant="selectedProgKey === note ? 'flat' : 'outlined'"
+                  size="small" class="prog-key-btn"
+                  @click="selectedProgKey = note"
+                >{{ toDisplayNote(note) }}</v-btn>
+              </div>
+              <v-btn-toggle
+                v-model="selectedProgType"
+                mandatory density="compact" variant="outlined" color="primary"
+              >
+                <v-btn value="major" style="min-width:80px">Major</v-btn>
+                <v-btn value="minor" style="min-width:80px">Minor</v-btn>
+              </v-btn-toggle>
+            </template>
+
+          </v-card-text>
+        </v-card>
+
+        <!-- Progression categories -->
+        <v-expansion-panels variant="accordion">
+          <v-expansion-panel
+            v-for="(progs, category) in COMMON_PROGRESSIONS"
+            :key="category"
+          >
+            <v-expansion-panel-title class="text-body-2 font-weight-semibold">
+              {{ category }}
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
+              <div
+                v-for="prog in progs"
+                :key="prog.name"
+                class="prog-item"
+              >
+                <div class="d-flex align-center justify-space-between mb-1">
+                  <span class="text-body-2 font-weight-medium">{{ prog.name }}</span>
+                  <v-btn
+                    size="x-small" variant="flat" color="primary"
+                    :disabled="!activeProgMajorRoot"
+                    @click="loadProgression(prog)"
+                  >Load</v-btn>
+                </div>
+                <div class="d-flex flex-wrap mb-1" style="gap:4px">
+                  <v-chip
+                    v-for="(label, li) in prog.nns"
+                    :key="li"
+                    size="x-small" variant="tonal"
+                    :color="label[0] === label[0].toLowerCase() ? 'secondary' : 'primary'"
+                  >{{ label }}</v-chip>
+                </div>
+                <div class="text-caption text-medium-emphasis mb-1">{{ prog.description }}</div>
+                <div class="text-caption" style="opacity:0.4">
+                  <span v-for="(ex, ei) in prog.examples" :key="ex.title">
+                    {{ ex.title }}<span v-if="ei < prog.examples.length - 1"> · </span>
+                  </span>
+                </div>
+              </div>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+        </v-expansion-panels>
+
+      </div>
+    </v-expand-transition>
+
+    <!-- ── Reference: extended chords ────────────────────────────────────── -->
+    <v-expansion-panels variant="accordion" class="mt-2">
       <v-expansion-panel>
         <v-expansion-panel-title class="text-body-2 text-medium-emphasis">
-          How to handle complex chords
+          Using chords with extensions (7ths, sus, add…)
         </v-expansion-panel-title>
         <v-expansion-panel-text>
-          <p class="text-body-2 mb-2">Reduce these to their triad form before selecting:</p>
-          <ul class="text-body-2">
-            <li><strong>Major</strong> ← maj7, sus, add, dom7 (7)</li>
-            <li><strong>Minor</strong> ← m7, m6</li>
-            <li><strong>Diminished</strong> ← m7♭5, dim7</li>
+          <p class="text-body-2 mb-3">
+            Cadence works with triads for key detection. If your chart uses extended or altered chords,
+            pick the matching triad type — the key analysis still works correctly:
+          </p>
+          <ul class="text-body-2 mb-0">
+            <li class="mb-2">
+              <strong>Major</strong> — covers maj7, 6, sus2, sus4, add9, dominant 7
+              <span class="text-medium-emphasis">(e.g. G7 or Gsus4 → select G)</span>
+            </li>
+            <li class="mb-2">
+              <strong>Minor</strong> — covers m7, m9, m6, m11
+              <span class="text-medium-emphasis">(e.g. Am7 → select Am)</span>
+            </li>
+            <li>
+              <strong>Diminished</strong> — covers dim7 and half-diminished (m7♭5 / ø)
+              <span class="text-medium-emphasis">(e.g. Bø → select Bdim)</span>
+            </li>
           </ul>
         </v-expansion-panel-text>
       </v-expansion-panel>
@@ -459,7 +522,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, onBeforeRouteLeave } from 'vue-router'
-import { musicalKeys, noteToSharp, checkKeys, chordToNNS, progressionToNNS } from '@/core/musicTheory.js'
+import { musicalKeys, noteToSharp, checkKeys, chordToNNS, progressionToNNS, COMMON_PROGRESSIONS } from '@/core/musicTheory.js'
 import { useAudio } from '../composables/useAudio'
 import { useAuth } from '../composables/useAuth'
 import { supabase } from '../lib/supabase'
@@ -474,6 +537,8 @@ const SHARP_TO_FLAT = { 'A#': 'Bb', 'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'A
 const MAJOR_ROOTS   = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#']
 const NNS_LABELS    = ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°']
 const SUB_RULES     = { 1: [3, 6], 4: [2], 5: [7], 6: [1, 3] }
+const PROG_NOTES    = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']
+const MINOR_ORDER   = [5, 6, 0, 1, 2, 3, 4]
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
@@ -506,6 +571,10 @@ const explanationError     = ref('')
 const dragSrcIndex         = ref(null)
 const dragOverIndex        = ref(null)
 const chordLimitWarning    = ref(false)
+const progSectionOpen      = ref(false)
+const selectedProgKey      = ref(null)
+const selectedProgType     = ref('major')
+const progKeyOverride      = ref(false)
 
 // ─── Router / auth ────────────────────────────────────────────────────────────
 
@@ -643,11 +712,31 @@ function reset() {
   explanationError.value    = ''
   showAllKeys.value         = false
   chordLimitWarning.value   = false
+  selectedProgKey.value     = null
+  progKeyOverride.value     = false
 }
 function loadKey(majorRoot) {
   selectedChordsSharp.value = [...musicalKeys[majorRoot]]
   explanationText.value     = ''
   explanationError.value    = ''
+}
+
+function loadProgression(prog) {
+  const majorRoot = activeProgMajorRoot.value
+  if (!majorRoot) return
+  const keyChords = musicalKeys[majorRoot]
+  if (!keyChords) return
+  const srcChords = prog.minor
+    ? MINOR_ORDER.map(i => keyChords[i])
+    : keyChords
+  selectedChordsSharp.value = prog.degrees.map(d => srcChords[d])
+  explanationText.value  = ''
+  explanationError.value = ''
+}
+
+function onSwapProgKey() {
+  progKeyOverride.value = true
+  selectedProgKey.value = detectedKey.value
 }
 
 // ─── Drag-to-reorder ─────────────────────────────────────────────────────────
@@ -696,6 +785,23 @@ const countColor = computed(() => {
   const n = selectedChordsSharp.value.length
   return n === 7 ? 'text-error' : n > 4 ? 'text-warning' : 'text-success'
 })
+
+const detectedKey = computed(() => keyPairs.value[0]?.majorRoot ?? null)
+
+const activeProgMajorRoot = computed(() => {
+  if (selectedProgKey.value !== null) {
+    if (selectedProgType.value === 'minor') {
+      const idx = PROG_NOTES.indexOf(selectedProgKey.value)
+      return idx === -1 ? null : PROG_NOTES[(idx + 3) % 12]
+    }
+    return selectedProgKey.value
+  }
+  return detectedKey.value
+})
+
+const usingDetectedKey = computed(() =>
+  !progKeyOverride.value && !!detectedKey.value && selectedProgKey.value === null
+)
 
 function relativeMinorDisplay(majorRoot) {
   const kc = musicalKeys[majorRoot]
@@ -978,5 +1084,36 @@ onBeforeRouteLeave(() => {
 .key-card:hover {
   border-color: rgba(200, 169, 110, 0.3) !important;
   box-shadow: 0 0 0 1px rgba(200,169,110,0.12) !important;
+}
+
+/* ── Common Progressions ─────────────────────────────────────────────────── */
+.prog-key-card {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+.prog-key-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.prog-key-scroll::-webkit-scrollbar { display: none; }
+.prog-key-btn {
+  flex-shrink: 0 !important;
+  min-width: 44px !important;
+  min-height: 40px !important;
+  border-radius: 999px !important;
+  text-transform: none !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+}
+.prog-item {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.prog-item:last-child {
+  border-bottom: none;
+  padding-bottom: 2px;
 }
 </style>
