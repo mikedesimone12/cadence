@@ -1,13 +1,30 @@
 runtime: nodejs20
-instance_class: F1
-manual_scaling:
-  instances: 0
+env: standard
+
 handlers:
 - url: /assets
   static_dir: dist/assets
-- url: /favicon.ico
-  static_files: dist/favicon.ico
-  upload: dist/favicon.ico
+  secure: always
+
+- url: /sounds
+  static_dir: dist/sounds
+  secure: always
+
+- url: /(.*\.(js|css|png|jpg|ico|svg|woff2?|ttf))$
+  static_files: dist/\1
+  upload: dist/(.*\.(js|css|png|jpg|ico|svg|woff2?|ttf))$
+  secure: always
+
 - url: /.*
   static_files: dist/index.html
   upload: dist/index.html
+  secure: always
+  http_headers:
+    X-Frame-Options: DENY
+    X-Content-Type-Options: nosniff
+    Referrer-Policy: strict-origin-when-cross-origin
+    Cache-Control: no-cache
+
+automatic_scaling:
+  min_instances: 0
+  max_instances: 2

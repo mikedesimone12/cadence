@@ -10,6 +10,11 @@ export default defineConfig({
   resolve: {
     alias: { '@': '/src' },
   },
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    sourcemap: false,
+  },
   server: {
     proxy: {
       '/api': 'http://localhost:8080',
