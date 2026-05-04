@@ -1108,8 +1108,8 @@ onBeforeRouteLeave(() => {
 
 /* Major */
 .chord-btn--major {
-  background: rgba(200, 169, 110, 0.08);
-  border-color: rgba(200, 169, 110, 0.2);
+  background: rgba(200, 169, 110, 0.12);
+  border-color: rgba(200, 169, 110, 0.15);
   color: #C8A96E;
 }
 .chord-btn--major:hover {
@@ -1126,8 +1126,8 @@ onBeforeRouteLeave(() => {
 
 /* Minor */
 .chord-btn--minor {
-  background: rgba(110, 142, 173, 0.08);
-  border-color: rgba(110, 142, 173, 0.2);
+  background: rgba(110, 142, 173, 0.12);
+  border-color: rgba(110, 142, 173, 0.15);
   color: #6E8EAD;
 }
 .chord-btn--minor:hover {
@@ -1144,7 +1144,7 @@ onBeforeRouteLeave(() => {
 
 /* Diminished */
 .chord-btn--dim {
-  background: rgba(232, 87, 42, 0.08);
+  background: rgba(232, 87, 42, 0.14);
   border-color: rgba(232, 87, 42, 0.2);
   color: #E8572A;
 }
