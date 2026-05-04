@@ -173,25 +173,62 @@
 
     <v-card class="mb-4">
       <v-card-text class="pb-2">
-        <div v-for="group in chordGroups" :key="group.label" class="mb-3">
-          <div class="group-label">{{ group.label }}</div>
-          <div class="chord-grid mt-1">
-            <v-tooltip
-              v-for="c in group.chords" :key="c.sharp"
-              location="bottom" :disabled="!isShowingTips"
-            >
-              <template #activator="{ props }">
-                <v-btn
-                  v-bind="props"
-                  :color="isSelected(c.sharp) ? 'primary' : (showFingering && vizChord === c.sharp ? 'secondary' : undefined)"
-                  :variant="isSelected(c.sharp) ? 'flat' : (showFingering && vizChord === c.sharp ? 'tonal' : 'outlined')"
-                  size="small" class="chord-btn"
-                  @click="handleChordClick(c.sharp)"
-                >{{ c.display }}</v-btn>
+        <div v-for="(group, gi) in chordGroups" :key="group.label">
+
+          <!-- Separator between quality groups -->
+          <div v-if="gi > 0" class="group-divider" />
+
+          <!-- Section header: colored label + info icon -->
+          <div class="group-header mb-2">
+            <span class="group-label" :class="`group-label--${group.quality}`">{{ group.label }}</span>
+            <v-tooltip location="right" :open-delay="200">
+              <template #activator="{ props: tipProps }">
+                <v-icon
+                  v-bind="tipProps"
+                  size="13"
+                  class="group-info-icon"
+                  :class="`group-info-icon--${group.quality}`"
+                >mdi-information-outline</v-icon>
               </template>
-              <span>{{ chordTonesToDisplay(c.sharp) }}</span>
+              <span>{{ group.info }}</span>
             </v-tooltip>
           </div>
+
+          <!-- Circle-of-fifths chord buttons -->
+          <div class="chord-grid mb-3">
+            <v-tooltip
+              v-for="c in group.chords"
+              :key="c.sharp"
+              location="bottom"
+              :disabled="!isShowingTips"
+            >
+              <template #activator="{ props: activatorProps }">
+                <button
+                  v-bind="activatorProps"
+                  class="chord-btn"
+                  :class="[
+                    `chord-btn--${group.quality}`,
+                    { 'chord-btn--selected': isSelected(c.sharp) },
+                    { 'chord-btn--viz': showFingering && vizChord === c.sharp && !isSelected(c.sharp) },
+                  ]"
+                  :style="chordAnimStyle(c.sharp)"
+                  @click="handleChordClick(c.sharp)"
+                  @pointerdown="onChordPointerDown(c.sharp)"
+                  @pointerup="onChordPointerUp(c.sharp)"
+                  @pointercancel="pressingChord.value = null"
+                >{{ c.display }}</button>
+              </template>
+              <!-- Enhanced 3-line tooltip -->
+              <div class="chord-tooltip-content">
+                <div class="chord-tooltip-tones">{{ chordTooltip(c.sharp).tones }}</div>
+                <div class="chord-tooltip-quality">{{ chordTooltip(c.sharp).quality }}</div>
+                <div v-if="chordTooltip(c.sharp).context" class="chord-tooltip-ctx">
+                  {{ chordTooltip(c.sharp).context }}
+                </div>
+              </div>
+            </v-tooltip>
+          </div>
+
         </div>
       </v-card-text>
     </v-card>
@@ -538,7 +575,9 @@ const MAJOR_ROOTS   = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G'
 const NNS_LABELS    = ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°']
 const SUB_RULES     = { 1: [3, 6], 4: [2], 5: [7], 6: [1, 3] }
 const PROG_NOTES    = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']
-const MINOR_ORDER   = [5, 6, 0, 1, 2, 3, 4]
+const MINOR_ORDER      = [5, 6, 0, 1, 2, 3, 4]
+// Circle of fifths: C G D A E B | F Bb Eb Ab Db F# (sharps notation)
+const CIRCLE_OF_FIFTHS = ['C', 'G', 'D', 'A', 'E', 'B', 'F', 'A#', 'D#', 'G#', 'C#', 'F#']
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
@@ -665,7 +704,7 @@ function getChordTones(chordSharp) {
   return iv.map(i => CHROMATIC[(ri + i) % 12])
 }
 function chordTonesToDisplay(chordSharp) {
-  return getChordTones(chordSharp).map(toDisplayNote).join(', ')
+  return getChordTones(chordSharp).map(toDisplayNote).join(' · ')
 }
 
 // Color by chord quality
@@ -678,10 +717,65 @@ function chipColor(chordSharp) {
 // ─── Chord grids ─────────────────────────────────────────────────────────────
 
 const chordGroups = computed(() => [
-  { label: 'Major',      chords: MAJOR_ROOTS.map(s => ({ sharp: s,         display: toDisplay(s)         })) },
-  { label: 'Minor',      chords: MAJOR_ROOTS.map(s => ({ sharp: s + 'm',   display: toDisplay(s + 'm')   })) },
-  { label: 'Diminished', chords: MAJOR_ROOTS.map(s => ({ sharp: s + 'dim', display: toDisplay(s + 'dim') })) },
+  {
+    label: 'MAJOR', quality: 'major',
+    info: 'Bright, happy, stable sound',
+    chords: CIRCLE_OF_FIFTHS.map(s => ({ sharp: s,         display: toDisplay(s)         })),
+  },
+  {
+    label: 'MINOR', quality: 'minor',
+    info: 'Dark, emotional, introspective sound',
+    chords: CIRCLE_OF_FIFTHS.map(s => ({ sharp: s + 'm',   display: toDisplay(s + 'm')   })),
+  },
+  {
+    label: 'DIMINISHED', quality: 'dim',
+    info: 'Tense, unstable, dramatic sound',
+    chords: CIRCLE_OF_FIFTHS.map(s => ({ sharp: s + 'dim', display: toDisplay(s + 'dim') })),
+  },
 ])
+
+// ─── Chord tooltip helpers ────────────────────────────────────────────────────
+
+function chordContextLine(chordSharp) {
+  const key = detectedKey.value
+  if (!key) return null
+  const kc = musicalKeys[key]
+  if (!kc) return null
+  const idx = kc.indexOf(chordSharp)
+  if (idx === -1) return null
+  return `The ${NNS_LABELS[idx]} chord in ${toDisplayNote(key)} major`
+}
+
+function chordTooltip(chordSharp) {
+  const tones   = getChordTones(chordSharp).map(toDisplayNote).join(' · ')
+  const suffix  = chordSharp.replace(/^[A-G]#?/, '')
+  const quality = suffix === 'dim' ? 'Diminished — tense and dramatic'
+                : suffix === 'm'   ? 'Minor — dark and emotional'
+                :                    'Major — bright and stable'
+  return { tones, quality, context: chordContextLine(chordSharp) }
+}
+
+// ─── Press animation ──────────────────────────────────────────────────────────
+
+const pressingChord = ref(null)
+const bouncingChord = ref(null)
+let bounceTimer = null
+
+function onChordPointerDown(sharp) {
+  clearTimeout(bounceTimer)
+  bouncingChord.value = null
+  pressingChord.value = sharp
+}
+function onChordPointerUp(sharp) {
+  pressingChord.value = null
+  bouncingChord.value = sharp
+  bounceTimer = setTimeout(() => { bouncingChord.value = null }, 100)
+}
+function chordAnimStyle(sharp) {
+  if (pressingChord.value === sharp) return { transform: 'scale(0.95)', transition: 'transform 60ms ease-in' }
+  if (bouncingChord.value === sharp) return { transform: 'scale(1.02)', transition: 'transform 80ms ease-out' }
+  return { transform: 'scale(1)', transition: 'transform 100ms ease-out' }
+}
 
 // ─── Selection ───────────────────────────────────────────────────────────────
 
@@ -913,16 +1007,7 @@ onBeforeRouteLeave(() => {
   margin-bottom: 12px;
   display: block;
 }
-.group-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.5);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  padding-bottom: 6px;
-  display: block;
-}
+/* group-label replaced below with quality variants */
 .key-title {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 1.3rem;
@@ -967,29 +1052,145 @@ onBeforeRouteLeave(() => {
 .prog-chip { font-weight: 500; }
 
 /* ── Chord grid ─────────────────────────────────────────────────────────── */
+.group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.group-label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.group-label--major { color: #C8A96E; }
+.group-label--minor { color: #6E8EAD; }
+.group-label--dim   { color: #E8572A; }
+
+.group-info-icon { opacity: 0.55; cursor: help; }
+.group-info-icon--major { color: #C8A96E !important; }
+.group-info-icon--minor { color: #6E8EAD !important; }
+.group-info-icon--dim   { color: #E8572A !important; }
+
+.group-divider {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin: 16px 0;
+}
+
 .chord-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   gap: 5px;
 }
+
+/* Native button reset + base */
 .chord-btn {
-  text-transform: none !important;
-  min-width:  0    !important;
-  min-height: 52px !important;
-  width:      100% !important;
-  font-size:  0.9rem !important;
-  font-weight: 500 !important;
-  letter-spacing: 0 !important;
-  padding: 0 4px !important;
-  transition: box-shadow 0.15s, transform 0.1s !important;
+  appearance: none;
+  cursor: pointer;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  min-height: 52px;
+  width: 100%;
+  padding: 0 4px;
+  outline: none;
+  position: relative;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
-.chord-btn:active {
-  transform: scale(0.95) !important;
+.chord-btn:focus-visible {
+  outline: 2px solid rgba(255,255,255,0.3);
+  outline-offset: 2px;
 }
-/* selected chord button: dark text on gold, stronger glow */
-.v-btn.chord-btn.v-btn--variant-flat {
-  color: #0D0D0F !important;
-  box-shadow: 0 0 16px rgba(200,169,110,0.5) !important;
+
+/* Major */
+.chord-btn--major {
+  background: rgba(200, 169, 110, 0.08);
+  border-color: rgba(200, 169, 110, 0.2);
+  color: #C8A96E;
+}
+.chord-btn--major:hover {
+  background: rgba(200, 169, 110, 0.13);
+  border-color: rgba(200, 169, 110, 0.4);
+}
+.chord-btn--major.chord-btn--selected {
+  background: #C8A96E;
+  border-color: #C8A96E;
+  color: #0D0D0F;
+  box-shadow: 0 0 12px rgba(200, 169, 110, 0.5);
+  font-weight: 700;
+}
+
+/* Minor */
+.chord-btn--minor {
+  background: rgba(110, 142, 173, 0.08);
+  border-color: rgba(110, 142, 173, 0.2);
+  color: #6E8EAD;
+}
+.chord-btn--minor:hover {
+  background: rgba(110, 142, 173, 0.13);
+  border-color: rgba(110, 142, 173, 0.4);
+}
+.chord-btn--minor.chord-btn--selected {
+  background: #6E8EAD;
+  border-color: #6E8EAD;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(110, 142, 173, 0.5);
+  font-weight: 700;
+}
+
+/* Diminished */
+.chord-btn--dim {
+  background: rgba(232, 87, 42, 0.08);
+  border-color: rgba(232, 87, 42, 0.2);
+  color: #E8572A;
+}
+.chord-btn--dim:hover {
+  background: rgba(232, 87, 42, 0.13);
+  border-color: rgba(232, 87, 42, 0.4);
+}
+.chord-btn--dim.chord-btn--selected {
+  background: #E8572A;
+  border-color: #E8572A;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(232, 87, 42, 0.5);
+  font-weight: 700;
+}
+
+/* Fingering viz highlight */
+.chord-btn--viz { opacity: 0.65; }
+
+/* ── Chord tooltip ───────────────────────────────────────────────────────── */
+.chord-tooltip-content { max-width: 200px; }
+.chord-tooltip-tones {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.chord-tooltip-quality {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  margin-bottom: 2px;
+}
+.chord-tooltip-ctx {
+  font-size: 0.7rem;
+  opacity: 0.6;
+  font-style: italic;
+}
+
+/* ── Mobile overrides ────────────────────────────────────────────────────── */
+@media (max-width: 599px) {
+  .chord-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .chord-btn {
+    min-height: 56px;
+    font-size: 1rem;
+  }
 }
 
 /* ── Diatonic chord row in key card ─────────────────────────────────────── */
