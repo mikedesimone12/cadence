@@ -50,14 +50,22 @@
               label="Bass note" hide-details color="primary" class="mb-3"
               @update:model-value="setBassEnabled"
             />
+            <div class="text-overline text-medium-emphasis mb-1">Volume</div>
             <div class="d-flex align-center mb-2" style="gap: 8px">
-              <v-icon size="16" color="medium-emphasis">mdi-volume-low</v-icon>
+              <span class="text-caption text-medium-emphasis" style="min-width:48px">Chords</span>
               <v-slider
                 :model-value="volume" min="0" max="100" step="1"
                 color="primary" hide-details style="flex:1"
                 @update:model-value="setVolume"
               />
-              <v-icon size="16" color="medium-emphasis">mdi-volume-high</v-icon>
+            </div>
+            <div class="d-flex align-center mb-2" style="gap: 8px">
+              <span class="text-caption text-medium-emphasis" style="min-width:48px">Rhythm</span>
+              <v-slider
+                :model-value="rhythmVolume" min="0" max="100" step="1"
+                color="secondary" hide-details style="flex:1"
+                @update:model-value="setRhythmVolume"
+              />
             </div>
           </template>
           <v-switch v-model="showFingering" label="Show chord fingering" hide-details color="primary" class="mt-1" />
@@ -300,6 +308,55 @@
       >{{ r.label }}</v-chip>
     </div>
 
+    <!-- Rhythm section -->
+    <div class="text-overline text-medium-emphasis mb-2">Rhythm</div>
+    <v-btn-toggle
+      :model-value="rhythmMode"
+      mandatory variant="outlined" color="primary"
+      class="mb-3 rhythm-toggle"
+      @update:model-value="handleRhythmModeChange"
+    >
+      <v-btn value="off" class="rhythm-btn">
+        <div class="rhythm-btn-inner">
+          <span class="rhythm-btn-label">Off</span>
+          <span class="rhythm-btn-desc">Chords only</span>
+        </div>
+      </v-btn>
+      <v-btn value="click" class="rhythm-btn">
+        <div class="rhythm-btn-inner">
+          <span class="rhythm-btn-label">Click</span>
+          <span class="rhythm-btn-desc">Straight metronome</span>
+        </div>
+      </v-btn>
+      <v-btn value="acoustic" class="rhythm-btn">
+        <div class="rhythm-btn-inner">
+          <span class="rhythm-btn-label">Acoustic</span>
+          <span class="rhythm-btn-desc">Kick, snare, hi-hat</span>
+        </div>
+      </v-btn>
+      <v-btn value="hiphop" class="rhythm-btn">
+        <div class="rhythm-btn-inner">
+          <span class="rhythm-btn-label">Hip-Hop</span>
+          <span class="rhythm-btn-desc">808, snap, 16ths</span>
+        </div>
+      </v-btn>
+    </v-btn-toggle>
+
+    <!-- Swing slider (hip-hop only) -->
+    <v-expand-transition>
+      <div v-if="rhythmMode === 'hiphop'" class="d-flex align-center mb-3" style="gap: 8px">
+        <span class="text-caption text-medium-emphasis" style="min-width:44px">Swing</span>
+        <v-slider
+          :model-value="swingAmount" min="0" max="30" step="1"
+          color="secondary" hide-details style="flex:1"
+          @update:model-value="setSwingAmount"
+        />
+        <span class="text-caption" style="min-width:32px; color:#C8A96E; text-align:right">
+          {{ swingAmount }}%
+        </span>
+      </div>
+    </v-expand-transition>
+
     <!-- Current / next chord display (while playing) -->
     <v-expand-transition>
       <div v-if="isPlaying && currentChord" class="playback-display mb-4">
@@ -382,8 +439,9 @@ import { ref, computed, onMounted, onActivated, onBeforeUnmount, watch } from 'v
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import * as Tone from 'tone'
 import { musicalKeys, noteToSharp, getCapoSuggestion, chordToNNS, progressionToNNS } from '@/core/musicTheory.js'
-import { useAudio } from '../composables/useAudio'
-import { useAuth } from '../composables/useAuth'
+import { useAudio }  from '../composables/useAudio'
+import { useRhythm } from '../composables/useRhythm'
+import { useAuth }   from '../composables/useAuth'
 import { supabase } from '../lib/supabase'
 import ChordVisualizer from '../components/ChordVisualizer.vue'
 
@@ -471,6 +529,12 @@ const {
   bassEnabled, setBassEnabled,
   volume, setVolume,
 } = useAudio()
+
+const {
+  rhythmMode, rhythmVolume, swingAmount,
+  startDrums, stopDrums,
+  setRhythmVolume, setSwingAmount,
+} = useRhythm()
 
 onMounted(() => {
   fingeringChord.value = null
@@ -758,6 +822,8 @@ async function startPlayback() {
   barProgress.value     = 0
   activeChord.value     = progression.value[0] ?? null
 
+  startDrums(rhythmPreset.value)
+
   _scheduleId = transport.scheduleRepeat((time) => {
     const prog = progression.value
     if (!prog.length) { stopPlayback(); return }
@@ -798,6 +864,7 @@ function stopPlayback() {
   const transport = Tone.getTransport()
   transport.stop()
   transport.cancel()
+  stopDrums()
   _scheduleId      = null
   _progIdx         = 0
   _step            = 0
@@ -812,6 +879,15 @@ function setRhythm(value) {
   // Stop before switching so the new interval takes effect cleanly on next Play
   if (isPlaying.value) stopPlayback()
   rhythmPreset.value = value
+}
+
+function handleRhythmModeChange(mode) {
+  rhythmMode.value = mode
+  if (isPlaying.value) {
+    // Hot-swap drums without stopping chord playback
+    stopDrums()
+    if (mode !== 'off') startDrums(rhythmPreset.value)
+  }
 }
 
 // ─── Tap tempo ────────────────────────────────────────────────────────────────
@@ -1058,5 +1134,40 @@ onBeforeRouteLeave(() => {
   background: #C8A96E;
   border-radius: 2px;
   transition: width 0.08s linear;
+}
+
+/* ── Rhythm toggle ───────────────────────────────────────────────────────── */
+.rhythm-toggle {
+  width: 100%;
+}
+.rhythm-btn {
+  flex: 1 !important;
+  min-width: 0 !important;
+  height: auto !important;
+  padding: 7px 3px !important;
+  text-transform: none !important;
+}
+.rhythm-btn-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.rhythm-btn-label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1;
+}
+.rhythm-btn-desc {
+  font-size: 0.55rem;
+  opacity: 0.5;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+/* Boost description visibility when button is active */
+.v-btn--active .rhythm-btn-desc {
+  opacity: 0.75;
 }
 </style>
