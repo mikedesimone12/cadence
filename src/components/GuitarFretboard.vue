@@ -1,16 +1,25 @@
 <template>
   <div class="fretboard-wrap">
-    <div v-if="voicings.length > 1" class="carousel-row">
-      <button class="carousel-btn" :disabled="localIdx === 0" @click="prev">‹</button>
-      <span class="carousel-label">{{ currentVoicing?.label ?? '' }}</span>
-      <span class="carousel-count">{{ localIdx + 1 }}/{{ voicings.length }}</span>
-      <button class="carousel-btn" :disabled="localIdx >= voicings.length - 1" @click="next">›</button>
+    <div class="fretboard-header">
+      <div v-if="voicings.length > 1" class="carousel-row">
+        <button class="carousel-btn" :disabled="localIdx === 0" @click="prev">‹</button>
+        <span class="carousel-label">{{ currentVoicing?.label ?? '' }}</span>
+        <span class="carousel-count">{{ localIdx + 1 }}/{{ voicings.length }}</span>
+        <button class="carousel-btn" :disabled="localIdx >= voicings.length - 1" @click="next">›</button>
+      </div>
+      <button
+        class="carousel-btn lefty-btn"
+        :class="{ 'lefty-active': isLefty }"
+        @click="toggleLefty"
+        title="Left-handed view"
+      >↔</button>
     </div>
 
     <svg
       :viewBox="`0 0 ${FB_W} ${FB_H}`"
       preserveAspectRatio="xMidYMid meet"
       class="fretboard-svg"
+      :style="isLefty ? 'transform: scaleX(-1); transform-origin: 50% 50%;' : ''"
     >
       <defs>
         <filter id="fb-glow">
@@ -65,6 +74,7 @@
         font-family="Space Grotesk,monospace"
         font-size="9"
         fill="rgba(255,255,255,0.4)"
+        :style="leftyTextStyle"
       >{{ viewFretStart }}fr</text>
 
       <!-- Fret lines -->
@@ -101,6 +111,7 @@
           font-size="12"
           font-weight="700"
           fill="#E8572A"
+          :style="leftyTextStyle"
         >×</text>
         <!-- Open -->
         <circle
@@ -132,6 +143,7 @@
             font-size="8"
             font-weight="700"
             fill="#1A1A1F"
+            :style="leftyTextStyle"
           >{{ noteAtFret(si-1, frets[si-1]) }}</text>
         </g>
       </g>
@@ -145,6 +157,7 @@
         font-family="Space Grotesk,monospace"
         font-size="8"
         fill="rgba(255,255,255,0.3)"
+        :style="leftyTextStyle"
       >{{ name }}</text>
     </svg>
   </div>
@@ -198,6 +211,21 @@ function slotCenterX(f) {
 function noteAtFret(si, fret) {
   return CHROMATIC[(STRING_SEMITONES[si] + fret) % 12]
 }
+
+// ── Lefty mode ────────────────────────────────────────────────────────────────
+const isLefty = ref(localStorage.getItem('cadence_lefty_mode') === 'true')
+
+function toggleLefty() {
+  isLefty.value = !isLefty.value
+  localStorage.setItem('cadence_lefty_mode', String(isLefty.value))
+}
+
+// Counter-mirrors text so it reads correctly when the whole SVG is flipped
+const leftyTextStyle = computed(() =>
+  isLefty.value
+    ? 'transform: scaleX(-1); transform-box: fill-box; transform-origin: center;'
+    : ''
+)
 
 // ── Voicings ──────────────────────────────────────────────────────────────────
 const voicings   = computed(() => getGuitarVoicings(props.chordName))
@@ -274,14 +302,23 @@ function shouldDrawDot(si) {
   height: auto;
   max-height: 220px;
   display: block;
+  transform-origin: 50% 50%;
 }
 @media (max-width: 599px) {
   .fretboard-wrap { max-width: 100%; }
 }
 
+.fretboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
+  position: relative;
+  min-height: 28px;
+}
 .carousel-row {
   display: flex; align-items: center; justify-content: center;
-  gap: 10px; margin-bottom: 6px;
+  gap: 10px;
 }
 .carousel-btn {
   background: rgba(200,169,110,0.15);
@@ -301,4 +338,15 @@ function shouldDrawDot(si) {
   min-width: 48px; text-align: center;
 }
 .carousel-count { font-size: 0.7rem; color: rgba(255,255,255,0.4); }
+
+.lefty-btn {
+  position: absolute;
+  right: 0;
+  top: 0;
+  font-size: 0.9rem;
+}
+.lefty-active {
+  background: rgba(200,169,110,0.35) !important;
+  border-color: rgba(200,169,110,0.6) !important;
+}
 </style>

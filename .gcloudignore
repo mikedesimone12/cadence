@@ -9,6 +9,12 @@ public/
 vite.config.js
 babel.config.js
 package-lock.json
+cloudbuild.yaml
+deploy.sh
+index.html
 
-# Only deploy the dist/ folder and config files
-# App Engine needs: dist/, app.yaml
+# Explicitly include the pre-built dist/ even though .gitignore excludes it
+!dist/
+!dist/**
+
+# Deploy: dist/ (pre-built), app.yaml, server.js, package.json

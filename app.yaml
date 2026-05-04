@@ -1,6 +1,13 @@
 runtime: nodejs20
 env: standard
 
+# Skip the automatic `npm run build` step — we deploy a pre-built dist/
+build_env_variables:
+  GOOGLE_NODE_RUN_SCRIPTS: ""
+
+# env_variables (ANTHROPIC_API_KEY) are injected at deploy time by deploy.sh
+# from the local .env file — never commit secrets here
+
 handlers:
 - url: /assets
   static_dir: dist/assets
@@ -15,6 +22,12 @@ handlers:
   upload: dist/(.*\.(js|css|png|jpg|ico|svg|woff2?|ttf))$
   secure: always
 
+# API requests go to the Node.js server (Anthropic proxy)
+- url: /api/.*
+  script: auto
+  secure: always
+
+# SPA catch-all: serve the built index.html for all other routes
 - url: /.*
   static_files: dist/index.html
   upload: dist/index.html

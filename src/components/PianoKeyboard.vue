@@ -1,16 +1,17 @@
 <template>
   <div class="piano-wrap">
     <svg
-      :viewBox="`0 0 ${SVG_W} ${SVG_H}`"
+      :viewBox="`-6 -6 ${SVG_W + 12} ${SVG_H + 12}`"
       preserveAspectRatio="xMidYMid meet"
+      overflow="visible"
       class="piano-svg"
     >
       <defs>
-        <filter id="key-glow" x="-50%" y="-50%" width="200%" height="200%">
+        <filter id="key-glow" x="-20%" y="-20%" width="140%" height="140%">
           <feGaussianBlur stdDeviation="3" result="blur"/>
           <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
-        <filter id="bass-glow" x="-50%" y="-50%" width="200%" height="200%">
+        <filter id="bass-glow" x="-20%" y="-20%" width="140%" height="140%">
           <feGaussianBlur stdDeviation="3" result="blur"/>
           <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
@@ -99,7 +100,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { getPianoVoicing } from '../core/chordVoicings.js'
 import { useAudio } from '../composables/useAudio.js'
 
@@ -124,7 +125,13 @@ const INDICATOR_R = 7   // radius of highlight dot
 // Responsive: single octave on mobile
 const isMobile = ref(typeof window !== 'undefined' && window.innerWidth < 600)
 function onResize() { isMobile.value = window.innerWidth < 600 }
-onMounted(() => window.addEventListener('resize', onResize))
+onMounted(async () => {
+  window.addEventListener('resize', onResize)
+  await nextTick()
+  // Force recompute after first paint — Safari mobile may not report correct
+  // container width on initial mount
+  isMobile.value = window.innerWidth < 600
+})
 onUnmounted(() => window.removeEventListener('resize', onResize))
 
 const octaves = computed(() => isMobile.value ? [4] : [3, 4])
