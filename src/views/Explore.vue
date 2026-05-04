@@ -221,7 +221,6 @@
               <!-- Enhanced 3-line tooltip -->
               <div class="chord-tooltip-content">
                 <div class="chord-tooltip-tones">{{ chordTooltip(c.sharp).tones }}</div>
-                <div class="chord-tooltip-quality">{{ chordTooltip(c.sharp).quality }}</div>
                 <div v-if="chordTooltip(c.sharp).context" class="chord-tooltip-ctx">
                   {{ chordTooltip(c.sharp).context }}
                 </div>
