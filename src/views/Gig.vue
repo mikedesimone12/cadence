@@ -958,7 +958,7 @@ import { progressionToNNS, noteToSharp, musicalKeys, transposeProgression, getCa
 import { useAudio } from '../composables/useAudio'
 import AuthModal from '../components/AuthModal.vue'
 import ChordVisualizer from '../components/ChordVisualizer.vue'
-import { searchTracks, getTrackFeatures, getMusicBrainzData } from '../services/spotifySearch'
+import { searchTracks, getTrackFeatures, getSongBpmData, getMusicBrainzData } from '../services/spotifySearch'
 import { sanitizeText, sanitizeChord } from '../utils/sanitize'
 import { validateBPM, validateText, validateChordChart } from '../utils/validate'
 
@@ -1177,29 +1177,31 @@ function onSpotifySelect(track) {
   songForm.value.artist = track.artist
   selectedSpotifyTrack.value = track
 
-  getTrackFeatures(track.spotifyId).catch(() => null).then(f => {
+  // Fire all sources in parallel; first non-null result wins per field
+  Promise.allSettled([
+    getTrackFeatures(track.spotifyId).catch(() => null),
+    getSongBpmData(track.title, track.artist).catch(() => null),
+  ]).then(([spotifyRes, bpmRes]) => {
     if (!songDialog.value) return
 
-    const hasKey = !!(f?.key)
-    const hasBpm = !!(f?.bpm)
+    const f       = spotifyRes.status === 'fulfilled' ? spotifyRes.value : null
+    const bpmData = bpmRes.status    === 'fulfilled' ? bpmRes.value    : null
 
-    if (hasKey) {
+    // Key: Spotify audio-features first, GetSongBPM second
+    if (f?.key) {
       const isMinor = f.key.endsWith('m')
       songForm.value.key_root = isMinor ? f.key.slice(0, -1) : f.key
       songForm.value.key_type = isMinor ? 'minor' : 'major'
+    } else if (bpmData?.key) {
+      songForm.value.key_root = bpmData.key
+      songForm.value.key_type = bpmData.keyType || 'major'
     }
-    if (hasBpm) songForm.value.bpm = f.bpm
 
-    // MusicBrainz fallback for any fields Spotify left empty
-    if (!hasKey || !hasBpm) {
-      getMusicBrainzData(track.title, track.artist).then(mb => {
-        if (!mb || !songDialog.value) return
-        if (!hasKey && mb.key) {
-          songForm.value.key_root = mb.key
-          songForm.value.key_type = mb.keyType || 'major'
-        }
-        if (!hasBpm && mb.bpm) songForm.value.bpm = mb.bpm
-      })
+    // BPM: Spotify audio-features first, GetSongBPM second
+    if (f?.bpm) {
+      songForm.value.bpm = f.bpm
+    } else if (bpmData?.bpm) {
+      songForm.value.bpm = bpmData.bpm
     }
   })
 }

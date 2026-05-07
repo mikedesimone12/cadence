@@ -26,6 +26,20 @@ export async function getTrackFeatures(spotifyId) {
   return data.features || null
 }
 
+export async function getSongBpmData(title, artist) {
+  if (!title) return null
+  try {
+    const params = new URLSearchParams({ title })
+    if (artist) params.set('artist', artist)
+    const res = await fetch(`/api/getsongbpm?${params}`)
+    if (!res.ok) return null
+    const data = await res.json()
+    return (data.key || data.bpm) ? data : null
+  } catch {
+    return null
+  }
+}
+
 export async function getMusicBrainzData(title, artist) {
   if (!title) return null
   try {

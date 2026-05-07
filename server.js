@@ -261,6 +261,44 @@ app.get('/api/spotify/features/:trackId', async (req, res) => {
   }
 });
 
+// ── /api/getsongbpm ──────────────────────────────────────────────────────────
+// Requires GETSONGBPM_API_KEY in env (free at getsongbpm.com/api, 100 req/day).
+// Returns { bpm, key, keyType } — silently returns nulls if key not configured.
+app.get('/api/getsongbpm', async (req, res) => {
+  const apiKey = process.env.GETSONGBPM_API_KEY;
+  if (!apiKey) return res.json({ bpm: null, key: null, keyType: null });
+
+  try {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    if (!checkRateLimit(ip, 'getsongbpm', 30)) {
+      return res.status(429).json({ error: 'Too many requests. Try again later.' });
+    }
+
+    const title  = req.query.title?.trim();
+    const artist = req.query.artist?.trim();
+    if (!title) return res.status(400).json({ error: 'title required' });
+
+    const lookup = [artist, title].filter(Boolean).join(' ');
+    const url = `https://api.getsongbpm.com/search/?api_key=${apiKey}&type=both&lookup=${encodeURIComponent(lookup)}`;
+
+    const r = await fetch(url);
+    if (!r.ok) return res.json({ bpm: null, key: null, keyType: null });
+
+    const data = await r.json();
+    const result = data.search?.[0];
+    if (!result) return res.json({ bpm: null, key: null, keyType: null });
+
+    res.json({
+      bpm:     result.tempo ? parseInt(result.tempo, 10) : null,
+      key:     result.key   || null,
+      keyType: result.mode  || 'major',
+    });
+  } catch (err) {
+    console.error('GetSongBPM error:', err.message);
+    res.json({ bpm: null, key: null, keyType: null });
+  }
+});
+
 // ── /api/musicbrainz ─────────────────────────────────────────────────────────
 // Proxy for MusicBrainz → AcousticBrainz key/BPM lookup.
 // Runs server-side to set a valid User-Agent (MB requires it) and avoid CORS.
