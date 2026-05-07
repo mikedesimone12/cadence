@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "vite",
+    "dev": "concurrently \"vite --port 8080\" \"node server.js\"",
+    "dev:vite": "vite --port 8080",
+    "dev:server": "node server.js",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
@@ -27,6 +29,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.1.0",
+    "concurrently": "^9.2.1",
     "eslint": "^8.57.0",
     "eslint-plugin-vue": "^9.25.0",
     "husky": "^9.1.7",

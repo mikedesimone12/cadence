@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const port = process.env.PORT || 8080;
+const port = process.env.PORT || 3001;
 
 // Trust App Engine's load balancer so req.ip reflects the real client IP
 app.set('trust proxy', 1);

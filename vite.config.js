@@ -28,8 +28,13 @@ export default defineConfig({
     },
   },
   server: {
+    port: 8080,
     proxy: {
-      '/api': 'http://localhost:8080',
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+      },
     },
     headers: {
       'X-Frame-Options': 'DENY',
