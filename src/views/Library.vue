@@ -120,10 +120,15 @@
 
               <!-- Card header: title + confidence dot + chevron -->
               <div class="d-flex align-start justify-space-between mb-2">
-                <div style="min-width: 0; flex: 1">
-                  <div class="song-title text-truncate">{{ song.title }}</div>
-                  <div v-if="song.artist" class="lib-song-artist text-truncate">
-                    {{ song.artist }}
+                <div class="d-flex align-start flex-grow-1" style="gap: 10px; min-width: 0">
+                  <v-avatar v-if="song.album_art" size="36" rounded="md" class="flex-shrink-0">
+                    <v-img :src="song.album_art" :alt="song.title" />
+                  </v-avatar>
+                  <div style="min-width: 0; flex: 1">
+                    <div class="song-title text-truncate">{{ song.title }}</div>
+                    <div v-if="song.artist" class="lib-song-artist text-truncate">
+                      {{ song.artist }}
+                    </div>
                   </div>
                 </div>
                 <div class="d-flex align-center ml-2" style="gap: 6px; flex-shrink: 0">

@@ -12,17 +12,37 @@
       </v-card-title>
 
       <v-card-text class="px-5 pt-3">
-        <!-- Google OAuth -->
-        <v-btn
-          variant="outlined"
-          block
-          class="mb-4"
-          :loading="googleLoading"
-          @click="handleGoogle"
-        >
-          <v-icon start>mdi-google</v-icon>
-          Continue with Google
-        </v-btn>
+        <!-- Social sign-in -->
+        <div class="text-caption text-center text-medium-emphasis mb-2">Continue with</div>
+        <div class="d-flex mb-4" style="gap: 8px">
+          <v-btn
+            variant="outlined" size="small"
+            class="social-btn"
+            :loading="googleLoading"
+            @click="handleGoogle"
+          >
+            <v-icon size="18" class="mr-1">mdi-google</v-icon>
+            Google
+          </v-btn>
+          <v-btn
+            variant="outlined" size="small"
+            class="social-btn"
+            :loading="appleLoading"
+            @click="handleApple"
+          >
+            <v-icon size="18" class="mr-1">mdi-apple</v-icon>
+            Apple
+          </v-btn>
+          <v-btn
+            variant="outlined" size="small"
+            class="social-btn"
+            :loading="facebookLoading"
+            @click="handleFacebook"
+          >
+            <v-icon size="18" class="mr-1">mdi-facebook</v-icon>
+            Facebook
+          </v-btn>
+        </div>
 
         <div class="divider-row mb-4">
           <v-divider />
@@ -160,16 +180,18 @@ import VueHcaptcha from '@hcaptcha/vue3-hcaptcha'
 defineProps({ modelValue: Boolean })
 const emit = defineEmits(['update:modelValue'])
 
-const { signInWithGoogle, signInWithEmail, signUp } = useAuth()
+const { signInWithGoogle, signInWithApple, signInWithFacebook, signInWithEmail, signUp } = useAuth()
 
-const tab           = ref('signin')
-const email         = ref('')
-const password      = ref('')
-const showPassword  = ref(false)
-const error         = ref('')
-const googleLoading = ref(false)
-const emailLoading  = ref(false)
-const signUpSuccess = ref(false)
+const tab             = ref('signin')
+const email           = ref('')
+const password        = ref('')
+const showPassword    = ref(false)
+const error           = ref('')
+const googleLoading   = ref(false)
+const appleLoading    = ref(false)
+const facebookLoading = ref(false)
+const emailLoading    = ref(false)
+const signUpSuccess   = ref(false)
 
 // CAPTCHA
 const captchaToken = ref(null)
@@ -193,10 +215,31 @@ async function handleGoogle() {
   error.value = ''
   try {
     await signInWithGoogle()
-    // redirect happens — modal will close naturally
   } catch (err) {
     error.value = err.message
     googleLoading.value = false
+  }
+}
+
+async function handleApple() {
+  appleLoading.value = true
+  error.value = ''
+  try {
+    await signInWithApple()
+  } catch (err) {
+    error.value = err.message
+    appleLoading.value = false
+  }
+}
+
+async function handleFacebook() {
+  facebookLoading.value = true
+  error.value = ''
+  try {
+    await signInWithFacebook()
+  } catch (err) {
+    error.value = err.message
+    facebookLoading.value = false
   }
 }
 
@@ -238,5 +281,13 @@ async function handleSignUp() {
 .divider-text {
   white-space: nowrap;
   flex-shrink: 0;
+}
+.social-btn {
+  flex: 1;
+  min-width: 0;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+.social-btn:hover {
+  border-color: rgba(200, 169, 110, 0.3) !important;
 }
 </style>

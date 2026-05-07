@@ -34,6 +34,22 @@ export function useAuth() {
     if (error) throw error
   }
 
+  async function signInWithApple() {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'apple',
+      options: { redirectTo: window.location.origin },
+    })
+    if (error) throw error
+  }
+
+  async function signInWithFacebook() {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'facebook',
+      options: { redirectTo: window.location.origin },
+    })
+    if (error) throw error
+  }
+
   async function signInWithEmail(email, password) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
@@ -56,5 +72,5 @@ export function useAuth() {
     if (error) throw error
   }
 
-  return { currentUser, signInWithGoogle, signInWithEmail, signUp, signOut }
+  return { currentUser, signInWithGoogle, signInWithApple, signInWithFacebook, signInWithEmail, signUp, signOut }
 }

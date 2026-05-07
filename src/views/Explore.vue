@@ -178,20 +178,9 @@
           <!-- Separator between quality groups -->
           <div v-if="gi > 0" class="group-divider" />
 
-          <!-- Section header: colored label + info icon -->
+          <!-- Section header -->
           <div class="group-header mb-2">
             <span class="group-label" :class="`group-label--${group.quality}`">{{ group.label }}</span>
-            <v-tooltip location="right" :open-delay="200">
-              <template #activator="{ props: tipProps }">
-                <v-icon
-                  v-bind="tipProps"
-                  size="13"
-                  class="group-info-icon"
-                  :class="`group-info-icon--${group.quality}`"
-                >mdi-information-outline</v-icon>
-              </template>
-              <span>{{ group.info }}</span>
-            </v-tooltip>
           </div>
 
           <!-- Circle-of-fifths chord buttons -->
@@ -218,13 +207,7 @@
                   @pointercancel="pressingChord.value = null"
                 >{{ c.display }}</button>
               </template>
-              <!-- Enhanced 3-line tooltip -->
-              <div class="chord-tooltip-content">
-                <div class="chord-tooltip-tones">{{ chordTooltip(c.sharp).tones }}</div>
-                <div v-if="chordTooltip(c.sharp).context" class="chord-tooltip-ctx">
-                  {{ chordTooltip(c.sharp).context }}
-                </div>
-              </div>
+              {{ chordTonesToDisplay(c.sharp) }}
             </v-tooltip>
           </div>
 
@@ -751,27 +734,6 @@ const chordGroups = computed(() => [
   },
 ])
 
-// ─── Chord tooltip helpers ────────────────────────────────────────────────────
-
-function chordContextLine(chordSharp) {
-  const key = detectedKey.value
-  if (!key) return null
-  const kc = musicalKeys[key]
-  if (!kc) return null
-  const idx = kc.indexOf(chordSharp)
-  if (idx === -1) return null
-  return `The ${NNS_LABELS[idx]} chord in ${toDisplayNote(key)} major`
-}
-
-function chordTooltip(chordSharp) {
-  const tones   = getChordTones(chordSharp).map(toDisplayNote).join(' · ')
-  const suffix  = chordSharp.replace(/^[A-G]#?/, '')
-  const quality = suffix === 'dim' ? 'Diminished — tense and dramatic'
-                : suffix === 'm'   ? 'Minor — dark and emotional'
-                :                    'Major — bright and stable'
-  return { tones, quality, context: chordContextLine(chordSharp) }
-}
-
 // ─── Press animation ──────────────────────────────────────────────────────────
 
 const pressingChord = ref(null)
@@ -1082,11 +1044,6 @@ onBeforeRouteLeave(() => {
 .group-label--minor { color: #6E8EAD; }
 .group-label--dim   { color: #E8572A; }
 
-.group-info-icon { opacity: 0.55; cursor: help; }
-.group-info-icon--major { color: #C8A96E !important; }
-.group-info-icon--minor { color: #6E8EAD !important; }
-.group-info-icon--dim   { color: #E8572A !important; }
-
 .group-divider {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   margin: 16px 0;
@@ -1177,24 +1134,6 @@ onBeforeRouteLeave(() => {
 
 /* Fingering viz highlight */
 .chord-btn--viz { opacity: 0.65; }
-
-/* ── Chord tooltip ───────────────────────────────────────────────────────── */
-.chord-tooltip-content { max-width: 200px; }
-.chord-tooltip-tones {
-  font-size: 0.8rem;
-  font-weight: 600;
-  margin-bottom: 2px;
-}
-.chord-tooltip-quality {
-  font-size: 0.75rem;
-  opacity: 0.8;
-  margin-bottom: 2px;
-}
-.chord-tooltip-ctx {
-  font-size: 0.7rem;
-  opacity: 0.6;
-  font-style: italic;
-}
 
 /* ── Mobile overrides ────────────────────────────────────────────────────── */
 @media (max-width: 599px) {

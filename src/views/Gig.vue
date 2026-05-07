@@ -167,6 +167,9 @@
                     <v-icon size="18" color="medium-emphasis" class="drag-handle mt-1" style="flex-shrink: 0">
                       mdi-drag-vertical
                     </v-icon>
+                    <v-avatar v-if="song.album_art" size="36" rounded="md" class="flex-shrink-0">
+                      <v-img :src="song.album_art" :alt="song.title" />
+                    </v-avatar>
                     <div class="flex-grow-1" style="min-width: 0">
                       <div class="d-flex align-start justify-space-between mb-1">
                         <div style="min-width: 0; flex: 1">
@@ -686,12 +689,6 @@
   <!-- AuthModal (always mounted) -->
   <AuthModal v-model="authOpen" />
 
-  <!-- Spotify import dialog -->
-  <SongImportDialog
-    v-model="importDialogOpen"
-    @song-selected="handleSongImported"
-  />
-
   <!-- Song form dialog -->
   <v-dialog v-model="songDialog" max-width="540" :persistent="savingSong" scrollable>
     <v-card>
@@ -700,35 +697,47 @@
       </v-card-title>
       <v-card-text class="px-5 pt-4">
 
-        <!-- Spotify import button -->
-        <div class="mb-4">
-          <v-btn
-            variant="outlined" color="secondary"
-            prepend-icon="mdi-spotify"
-            block
-            @click="importDialogOpen = true"
-          >Find on Spotify</v-btn>
-        </div>
-
-        <!-- Imported song indicator -->
-        <div
-          v-if="importedAlbumArt"
-          class="d-flex align-center mb-4 imported-indicator pa-2"
+        <!-- Inline Spotify search -->
+        <v-autocomplete
+          v-model="selectedSpotifyTrack"
+          v-model:search="spotifySearchQuery"
+          :items="spotifyResults"
+          item-value="spotifyId"
+          item-title="displayLabel"
+          :loading="spotifySearching"
+          no-filter
+          hide-no-data
+          placeholder="Search Spotify to autofill…"
+          variant="outlined"
+          density="compact"
+          hide-details
+          clearable
+          return-object
+          class="mb-4"
+          @update:model-value="onSpotifySelect"
+          @update:search="onSpotifySearch"
         >
-          <v-avatar size="32" rounded="md" class="mr-2">
-            <v-img :src="importedAlbumArt" />
-          </v-avatar>
-          <span class="text-caption text-medium-emphasis">
-            Imported from Spotify — add chord chart below
-          </span>
-          <v-btn
-            icon size="x-small" variant="text"
-            class="ml-auto"
-            @click="importedAlbumArt = null; importedSpotifyId = null"
-          >
-            <v-icon size="14">mdi-close</v-icon>
-          </v-btn>
-        </div>
+          <template #prepend-inner>
+            <v-icon style="color: #1DB954; margin-right: 2px">mdi-spotify</v-icon>
+          </template>
+          <template #item="{ props: itemProps, item }">
+            <v-list-item v-bind="itemProps" :title="undefined">
+              <template #prepend>
+                <v-avatar size="36" rounded="md" class="mr-3 flex-shrink-0">
+                  <v-img v-if="item.raw.albumArt" :src="item.raw.albumArt" :alt="item.raw.title" />
+                  <v-icon v-else color="medium-emphasis" size="18">mdi-music</v-icon>
+                </v-avatar>
+              </template>
+              <div class="spotify-item-title">{{ item.raw.title }}</div>
+              <div class="spotify-item-artist">{{ item.raw.artist }}</div>
+            </v-list-item>
+          </template>
+          <template v-if="selectedSpotifyTrack?.albumArt" #append-inner>
+            <v-avatar size="24" rounded="md">
+              <v-img :src="selectedSpotifyTrack.albumArt" />
+            </v-avatar>
+          </template>
+        </v-autocomplete>
 
         <!-- Mode toggle -->
         <v-btn-toggle
@@ -744,8 +753,9 @@
         <v-text-field
           v-model="songForm.title"
           label="Title *"
+          placeholder="Or type song title here"
           variant="outlined" density="compact" hide-details
-          class="mb-3" autofocus
+          class="mb-3"
         />
         <v-text-field
           v-model="songForm.artist"
@@ -941,7 +951,7 @@ import { progressionToNNS, noteToSharp, musicalKeys, transposeProgression, getCa
 import { useAudio } from '../composables/useAudio'
 import AuthModal from '../components/AuthModal.vue'
 import ChordVisualizer from '../components/ChordVisualizer.vue'
-import SongImportDialog from '../components/SongImportDialog.vue'
+import { searchTracks, getTrackFeatures } from '../services/spotifySearch'
 import { sanitizeText, sanitizeChord } from '../utils/sanitize'
 import { validateBPM, validateText, validateChordChart } from '../utils/validate'
 
@@ -1117,32 +1127,57 @@ const songDialog       = ref(false)
 const editingSong      = ref(null)
 const songFormError    = ref('')
 const savingSong       = ref(false)
-const importDialogOpen = ref(false)
-const importedAlbumArt = ref(null)
-const importedSpotifyId = ref(null)
+const spotifySearchQuery   = ref('')
+const spotifyResults       = ref([])
+const spotifySearching     = ref(false)
+const selectedSpotifyTrack = ref(null)
+let   spotifyDebounceTimer = null
 
-function handleSongImported(songData) {
-  songForm.value.title    = songData.title
-  songForm.value.artist   = songData.artist
-  songForm.value.key_root = songData.key || null
-  songForm.value.key_type = songData.keyType || 'major'
-  songForm.value.bpm      = songData.bpm || null
-  importedAlbumArt.value  = songData.albumArt
-  importedSpotifyId.value = songData.spotifyId
-  importDialogOpen.value  = false
-  songDialog.value        = true
+function cleanTitle(title) {
+  return title
+    .replace(/\s*[-–]\s*(Remaster(ed)?(\s+\d{4})?)/gi, '')
+    .replace(/\s*[-–]\s*(Re-?master(ed)?(\s+\d{4})?)/gi, '')
+    .replace(/\s*\((Remaster(ed)?(\s+\d{4})?)\)/gi, '')
+    .replace(/\s*\((Live[^)]*)\)/gi, '')
+    .replace(/\s*\((Radio Edit)\)/gi, '')
+    .replace(/\s*\((Single[^)]*)\)/gi, '')
+    .replace(/\s*\((Album[^)]*)\)/gi, '')
+    .trim()
+}
 
-  if (songData.featuresPending && songData.featuresPromise) {
-    songData.featuresPromise.then(f => {
-      if (!f || !songDialog.value) return
-      if (f.key) {
-        const isMinor = f.key.endsWith('m')
-        songForm.value.key_root = isMinor ? f.key.slice(0, -1) : f.key
-        songForm.value.key_type = isMinor ? 'minor' : 'major'
-      }
-      if (f.bpm) songForm.value.bpm = f.bpm
-    })
-  }
+function onSpotifySearch(val) {
+  clearTimeout(spotifyDebounceTimer)
+  if (!val || val.trim().length < 2) { spotifyResults.value = []; return }
+  spotifyDebounceTimer = setTimeout(async () => {
+    spotifySearching.value = true
+    try {
+      const tracks = await searchTracks(val)
+      spotifyResults.value = tracks.map(t => ({
+        ...t,
+        title: cleanTitle(t.title),
+        displayLabel: `${cleanTitle(t.title)} — ${t.artist}`,
+      }))
+    } catch { spotifyResults.value = [] }
+    finally { spotifySearching.value = false }
+  }, 350)
+}
+
+function onSpotifySelect(track) {
+  if (!track) return
+  const featuresPromise = getTrackFeatures(track.spotifyId).catch(() => null)
+  songForm.value.title  = track.title
+  songForm.value.artist = track.artist
+  selectedSpotifyTrack.value = track
+
+  featuresPromise.then(f => {
+    if (!f || !songDialog.value) return
+    if (f.key) {
+      const isMinor = f.key.endsWith('m')
+      songForm.value.key_root = isMinor ? f.key.slice(0, -1) : f.key
+      songForm.value.key_type = isMinor ? 'minor' : 'major'
+    }
+    if (f.bpm) songForm.value.bpm = f.bpm
+  })
 }
 
 const blankForm = () => ({
@@ -1217,6 +1252,9 @@ function openAddSong() {
   songFormSections.value = []
   songFormOrder.value = []
   songFormError.value = ''
+  spotifySearchQuery.value   = ''
+  spotifyResults.value       = []
+  selectedSpotifyTrack.value = null
   songDialog.value = true
 }
 
@@ -1244,6 +1282,9 @@ function openEditSong(song) {
     : []
   songFormOrder.value = Array.isArray(song.form_order) ? [...song.form_order] : []
   songFormError.value = ''
+  spotifySearchQuery.value   = ''
+  spotifyResults.value       = []
+  selectedSpotifyTrack.value = null
   songDialog.value = true
 }
 
@@ -1318,8 +1359,8 @@ async function saveSong() {
       notes:       songFormMode.value === 'simple' ? (sanitizeText(songForm.value.notes) || null) : null,
       sections:    sectionsPayload,
       form_order:  formOrderPayload,
-      ...(importedSpotifyId.value ? { spotify_id: importedSpotifyId.value } : {}),
-      ...(importedAlbumArt.value  ? { album_art:  importedAlbumArt.value  } : {}),
+      ...(selectedSpotifyTrack.value?.spotifyId ? { spotify_id: selectedSpotifyTrack.value.spotifyId } : {}),
+      ...(selectedSpotifyTrack.value?.albumArt  ? { album_art:  selectedSpotifyTrack.value.albumArt  } : {}),
     }
 
     if (editingSong.value) {
@@ -1343,9 +1384,10 @@ async function saveSong() {
     }
 
     await loadSongs()
-    songDialog.value        = false
-    importedAlbumArt.value  = null
-    importedSpotifyId.value = null
+    songDialog.value           = false
+    spotifySearchQuery.value   = ''
+    spotifyResults.value       = []
+    selectedSpotifyTrack.value = null
   } catch (e) {
     songFormError.value = e.message
   } finally {
@@ -1896,12 +1938,12 @@ onMounted(()   => { if (currentUser.value) loadSetlists() })
 onActivated(() => { if (currentUser.value) loadSetlists() })
 
 onBeforeRouteLeave(() => {
-  drillOpen.value         = false
-  songDialog.value        = false
-  importDialogOpen.value  = false
-  importedAlbumArt.value  = null
-  importedSpotifyId.value = null
-  deleteDialog.value      = false
+  drillOpen.value            = false
+  songDialog.value           = false
+  selectedSpotifyTrack.value = null
+  spotifySearchQuery.value   = ''
+  spotifyResults.value       = []
+  deleteDialog.value         = false
   newSetlistOpen.value    = false
   authOpen.value          = false
 })
@@ -2090,5 +2132,22 @@ watch(currentUser, user => {
   padding: 1px 4px;
   background: rgba(110, 142, 173, 0.08);
   border-radius: 4px;
+}
+
+/* ── Spotify autocomplete dropdown rows ──────────────────────────────────── */
+.spotify-item-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.spotify-item-artist {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.45);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>
