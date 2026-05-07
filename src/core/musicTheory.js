@@ -43,6 +43,7 @@ const FLAT_TO_SHARP = {
  * @returns {string} Equivalent in sharp notation.
  */
 export function noteToSharp(note) {
+  if (!note) return note
   const root = note.substring(0, 2)
   return FLAT_TO_SHARP[root]
     ? FLAT_TO_SHARP[root] + note.substring(2)
@@ -116,6 +117,7 @@ function chordSuffix(chord) {
  * chordToNNS('Bbm','Eb')  // → '5m'  (non-diatonic — returns null)
  */
 export function chordToNNS(chord, keyRoot) {
+  if (!chord || !keyRoot) return null
   const normalizedChord = noteToSharp(chord)
   const normalizedRoot  = noteToSharp(keyRoot)
   const keyChords = musicalKeys[normalizedRoot]
@@ -140,6 +142,7 @@ export function chordToNNS(chord, keyRoot) {
  * progressionToNNS(['D', 'A', 'Bm', 'G'], 'D')  // → ['1', '5', '6m', '4']
  */
 export function progressionToNNS(chords, keyRoot) {
+  if (!chords?.length || !keyRoot) return []
   return chords.map(chord => chordToNNS(chord, keyRoot))
 }
 

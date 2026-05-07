@@ -82,9 +82,25 @@ async function getSpotifyToken() {
 const PITCH_CLASS_TO_NOTE = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
 function spotifyKeyToNote(key, mode) {
-  if (key === -1) return null;
+  if (key === null || key === undefined || key === -1) return null;
   const note = PITCH_CLASS_TO_NOTE[key];
+  if (!note) return null;
   return mode === 0 ? `${note}m` : note;
+}
+
+function extractFeatures(f) {
+  if (!f) return null;
+  const key = spotifyKeyToNote(f.key, f.mode);
+  const bpm = f.tempo > 0 ? Math.round(f.tempo) : null;
+  if (!key && !bpm) return null;
+  return {
+    key,
+    bpm,
+    timeSignature: f.time_signature || null,
+    durationMs:    f.duration_ms    || null,
+    energy:        f.energy   != null ? Math.round(f.energy   * 100) : null,
+    valence:       f.valence  != null ? Math.round(f.valence  * 100) : null,
+  };
 }
 
 // ── /api/explain ─────────────────────────────────────────────────────────────
@@ -197,6 +213,8 @@ app.get('/api/spotify/search', async (req, res) => {
 });
 
 // ── /api/spotify/features/:trackId ───────────────────────────────────────────
+// Tries audio-features first; falls back to audio-analysis if features are
+// unavailable (deprecated for newer apps) or return no key/BPM.
 app.get('/api/spotify/features/:trackId', async (req, res) => {
   try {
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -210,32 +228,85 @@ app.get('/api/spotify/features/:trackId', async (req, res) => {
     }
 
     const token = await getSpotifyToken();
+    const authHeader = { 'Authorization': `Bearer ${token}` };
 
+    // ── 1. Try audio-features ────────────────────────────────────────────────
+    // Note: deprecated by Spotify for apps registered after Nov 2023 (returns 403).
+    let features = null;
     const featuresRes = await fetch(
       `https://api.spotify.com/v1/audio-features/${trackId}`,
-      { headers: { 'Authorization': `Bearer ${token}` } },
+      { headers: authHeader },
     );
-
-    if (!featuresRes.ok) {
-      // Features aren't available for all tracks — return null gracefully
-      return res.json({ features: null });
+    if (featuresRes.ok) {
+      features = extractFeatures(await featuresRes.json());
     }
 
-    const f = await featuresRes.json();
+    // ── 2. Fallback: audio-analysis ──────────────────────────────────────────
+    // Same deprecation as audio-features — kept for legacy app compatibility.
+    if (!features) {
+      const analysisRes = await fetch(
+        `https://api.spotify.com/v1/audio-analysis/${trackId}`,
+        { headers: authHeader },
+      );
+      if (analysisRes.ok) {
+        const a = await analysisRes.json();
+        features = extractFeatures(a?.track);
+      }
+    }
 
-    res.json({
-      features: {
-        key:           spotifyKeyToNote(f.key, f.mode),
-        bpm:           Math.round(f.tempo),
-        timeSignature: f.time_signature,
-        durationMs:    f.duration_ms,
-        energy:        Math.round(f.energy * 100),
-        valence:       Math.round(f.valence * 100),
-      },
-    });
+    res.json({ features });
   } catch (err) {
     console.error('Spotify features error:', err.message);
     res.status(500).json({ error: 'Could not fetch song details.' });
+  }
+});
+
+// ── /api/musicbrainz ─────────────────────────────────────────────────────────
+// Proxy for MusicBrainz → AcousticBrainz key/BPM lookup.
+// Runs server-side to set a valid User-Agent (MB requires it) and avoid CORS.
+app.get('/api/musicbrainz', async (req, res) => {
+  try {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    if (!checkRateLimit(ip, 'musicbrainz', 20)) {
+      return res.status(429).json({ error: 'Too many requests. Try again later.' });
+    }
+
+    const title  = req.query.title?.trim();
+    const artist = req.query.artist?.trim();
+    if (!title) return res.status(400).json({ error: 'title required' });
+
+    const UA = 'Cadence/1.0 (music practice app; cadence-491202.uc.r.appspot.com)';
+
+    // 1. Search MusicBrainz for the recording
+    const mbQuery = encodeURIComponent(
+      artist ? `recording:"${title}" AND artist:"${artist}"` : `recording:"${title}"`
+    );
+    const mbRes = await fetch(
+      `https://musicbrainz.org/ws/2/recording/?query=${mbQuery}&limit=1&fmt=json`,
+      { headers: { 'User-Agent': UA } }
+    );
+    if (!mbRes.ok) return res.json({ key: null, keyType: null, bpm: null });
+
+    const mbData = await mbRes.json();
+    const mbid   = mbData.recordings?.[0]?.id;
+    if (!mbid)   return res.json({ key: null, keyType: null, bpm: null });
+
+    // 2. AcousticBrainz low-level data (archived; returns null gracefully if unavailable)
+    const abRes = await fetch(
+      `https://acousticbrainz.org/${mbid}/low-level`,
+      { headers: { 'User-Agent': UA } }
+    );
+    if (!abRes.ok) return res.json({ key: null, keyType: null, bpm: null });
+
+    const abData = await abRes.json();
+    const bpm     = abData?.rhythm?.bpm     ? Math.round(abData.rhythm.bpm) : null;
+    const key     = abData?.tonal?.key_key  || null;
+    const keyType = abData?.tonal?.key_scale || 'major';
+
+    res.json({ key, keyType, bpm });
+  } catch (err) {
+    console.error('MusicBrainz error:', err.message);
+    res.json({ key: null, keyType: null, bpm: null });
   }
 });
 

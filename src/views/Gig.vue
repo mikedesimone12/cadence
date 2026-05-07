@@ -697,7 +697,7 @@
       </v-card-title>
       <v-card-text class="px-5 pt-4">
 
-        <!-- Inline Spotify search -->
+        <!-- Inline Spotify search (optional) -->
         <v-autocomplete
           v-model="selectedSpotifyTrack"
           v-model:search="spotifySearchQuery"
@@ -707,15 +707,16 @@
           :loading="spotifySearching"
           no-filter
           hide-no-data
-          placeholder="Search Spotify to autofill…"
+          placeholder="Search Spotify to auto-fill (optional)"
           variant="outlined"
           density="compact"
           hide-details
           clearable
           return-object
-          class="mb-4"
+          class="mb-1"
           @update:model-value="onSpotifySelect"
           @update:search="onSpotifySearch"
+          @click:clear="onSpotifyClear"
         >
           <template #prepend-inner>
             <v-icon style="color: #1DB954; margin-right: 2px">mdi-spotify</v-icon>
@@ -738,6 +739,13 @@
             </v-avatar>
           </template>
         </v-autocomplete>
+        <div class="text-caption text-medium-emphasis mb-1" style="margin-top: 4px; padding-left: 2px">
+          Can't find it? Fill in the fields below manually.
+        </div>
+
+        <v-divider class="my-3">
+          <span class="text-caption text-medium-emphasis px-2">Song details</span>
+        </v-divider>
 
         <!-- Mode toggle -->
         <v-btn-toggle
@@ -753,7 +761,6 @@
         <v-text-field
           v-model="songForm.title"
           label="Title *"
-          placeholder="Or type song title here"
           variant="outlined" density="compact" hide-details
           class="mb-3"
         />
@@ -801,7 +808,7 @@
             variant="outlined" density="compact" hide-details
             class="mb-2"
           />
-          <div v-if="formNNS.length" class="d-flex align-center flex-wrap mb-3" style="gap: 4px; padding-left: 2px">
+          <div v-if="songForm.key_root && formNNS.length" class="d-flex align-center flex-wrap mb-3" style="gap: 4px; padding-left: 2px">
             <span class="text-caption text-medium-emphasis mr-1">NNS:</span>
             <v-chip v-for="(nns, ni) in formNNS" :key="ni" size="x-small" variant="tonal" :color="nns ? 'primary' : 'error'">{{ nns ?? '?' }}</v-chip>
           </div>
@@ -951,7 +958,7 @@ import { progressionToNNS, noteToSharp, musicalKeys, transposeProgression, getCa
 import { useAudio } from '../composables/useAudio'
 import AuthModal from '../components/AuthModal.vue'
 import ChordVisualizer from '../components/ChordVisualizer.vue'
-import { searchTracks, getTrackFeatures } from '../services/spotifySearch'
+import { searchTracks, getTrackFeatures, getMusicBrainzData } from '../services/spotifySearch'
 import { sanitizeText, sanitizeChord } from '../utils/sanitize'
 import { validateBPM, validateText, validateChordChart } from '../utils/validate'
 
@@ -1146,6 +1153,8 @@ function cleanTitle(title) {
 }
 
 function onSpotifySearch(val) {
+  // Vuetify sets search to item-title after selection — ignore to avoid re-searching
+  if (val === selectedSpotifyTrack.value?.displayLabel) return
   clearTimeout(spotifyDebounceTimer)
   if (!val || val.trim().length < 2) { spotifyResults.value = []; return }
   spotifyDebounceTimer = setTimeout(async () => {
@@ -1164,20 +1173,43 @@ function onSpotifySearch(val) {
 
 function onSpotifySelect(track) {
   if (!track) return
-  const featuresPromise = getTrackFeatures(track.spotifyId).catch(() => null)
   songForm.value.title  = track.title
   songForm.value.artist = track.artist
   selectedSpotifyTrack.value = track
 
-  featuresPromise.then(f => {
-    if (!f || !songDialog.value) return
-    if (f.key) {
+  getTrackFeatures(track.spotifyId).catch(() => null).then(f => {
+    if (!songDialog.value) return
+
+    const hasKey = !!(f?.key)
+    const hasBpm = !!(f?.bpm)
+
+    if (hasKey) {
       const isMinor = f.key.endsWith('m')
       songForm.value.key_root = isMinor ? f.key.slice(0, -1) : f.key
       songForm.value.key_type = isMinor ? 'minor' : 'major'
     }
-    if (f.bpm) songForm.value.bpm = f.bpm
+    if (hasBpm) songForm.value.bpm = f.bpm
+
+    // MusicBrainz fallback for any fields Spotify left empty
+    if (!hasKey || !hasBpm) {
+      getMusicBrainzData(track.title, track.artist).then(mb => {
+        if (!mb || !songDialog.value) return
+        if (!hasKey && mb.key) {
+          songForm.value.key_root = mb.key
+          songForm.value.key_type = mb.keyType || 'major'
+        }
+        if (!hasBpm && mb.bpm) songForm.value.bpm = mb.bpm
+      })
+    }
   })
+}
+
+function onSpotifyClear() {
+  clearTimeout(spotifyDebounceTimer)
+  spotifySearchQuery.value   = ''
+  spotifyResults.value       = []
+  selectedSpotifyTrack.value = null
+  // leave songForm fields untouched — user may have typed manually
 }
 
 const blankForm = () => ({
@@ -1310,7 +1342,9 @@ async function saveSong() {
 
   try {
     const { key_root, key_type, chord_chart } = songForm.value
-    const majorRoot = key_type === 'minor' ? getRelativeMajor(key_root) : noteToSharp(key_root)
+    const majorRoot = key_root
+      ? (key_type === 'minor' ? getRelativeMajor(key_root) : noteToSharp(key_root))
+      : null
 
     let sectionsPayload = []
     let formOrderPayload = []
