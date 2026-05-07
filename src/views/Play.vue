@@ -476,7 +476,7 @@ import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import * as Tone from 'tone'
 import { musicalKeys, noteToSharp, getCapoSuggestion, chordToNNS, progressionToNNS } from '@/core/musicTheory.js'
 import { useAudio }  from '../composables/useAudio'
-import { useRhythm } from '../composables/useRhythm'
+import { useDrums }  from '../composables/useDrums'
 import { useAuth }   from '../composables/useAuth'
 import { supabase } from '../lib/supabase'
 import ChordVisualizer from '../components/ChordVisualizer.vue'
@@ -504,13 +504,14 @@ const RHYTHM_OPTIONS = [
   { label: '16ths',   value: 'sixteenths' },
 ]
 
-// interval = Tone.js time string; stepsPerBar = how many ticks before chord advances;
-// soundDuration = soundfont note duration in seconds
-const RHYTHM = {
-  whole:      { interval: '1m',  stepsPerBar: 1,  soundDuration: 1.4 },
-  eighths:    { interval: '8n',  stepsPerBar: 8,  soundDuration: 0.38 },
-  triplets:   { interval: '8t',  stepsPerBar: 12, soundDuration: 0.28 },
-  sixteenths: { interval: '16n', stepsPerBar: 16, soundDuration: 0.20 },
+// Master loop runs at 16n (or 8t for triplets).
+// stepsPerStrike: how many master steps between chord re-strikes.
+// soundDuration:  soundfont note duration in seconds.
+const CHORD_RHYTHM = {
+  whole:      { stepsPerStrike: 16, soundDuration: 1.4 },
+  eighths:    { stepsPerStrike: 2,  soundDuration: 0.38 },
+  triplets:   { stepsPerStrike: 1,  soundDuration: 0.28 },
+  sixteenths: { stepsPerStrike: 1,  soundDuration: 0.20 },
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -554,9 +555,10 @@ const barProgress     = ref(0)
 const tapTimes = []
 
 // Audio-thread mutable state (kept outside Vue reactivity for safety)
-let _progIdx    = 0
-let _step       = 0
-let _scheduleId = null
+let _progIdx     = 0
+let _masterStep  = 0
+let _barCount    = 0
+let _scheduleId  = null
 
 // ─── Audio ───────────────────────────────────────────────────────────────────
 
@@ -570,18 +572,20 @@ const {
 
 const {
   rhythmMode, rhythmVolume, swingAmount,
-  startDrums, stopDrums,
+  drumsReady, drumTick, initDrums,
   setRhythmVolume, setSwingAmount,
-} = useRhythm()
+} = useDrums()
 
 onMounted(() => {
   fingeringChord.value = null
   if (isAudible.value) loadInstruments()
+  if (rhythmMode.value !== 'off') initDrums()
   applyHistoryState()
 })
 onActivated(() => {
   fingeringChord.value = null
   if (isAudible.value && !isLoaded.value) loadInstruments()
+  if (rhythmMode.value !== 'off' && !drumsReady.value) initDrums()
   applyHistoryState()
 })
 
@@ -856,55 +860,80 @@ async function startPlayback() {
   if (!progression.value.length || !isAudible.value) return
   await ensureContext()
 
+  // Ensure drum kits are loading (fire-and-forget; drumTick guards !drumsReady)
+  initDrums()
+
   const transport = Tone.getTransport()
   const draw      = Tone.getDraw()
-  const cfg       = RHYTHM[rhythmPreset.value]
+  const mode      = rhythmMode.value
 
   transport.bpm.value = bpm.value
-  transport.cancel()   // clear any previously scheduled events
+  transport.cancel()
 
-  _progIdx = 0
-  _step    = 0
+  // Configure Transport-level swing before scheduling
+  if (mode === 'swing') {
+    transport.swing = 0.5
+    transport.swingSubdivision = '8n'
+  } else if (mode === 'funk') {
+    // Fine-grained funk swing handled manually inside drumTick; keep Transport clean
+    transport.swing = 0
+  } else {
+    transport.swing = 0
+  }
 
-  isPlaying.value       = true
+  // Triplets use 8t master grid (12 steps/bar); all other modes use 16n (16 steps/bar)
+  const isTriplet      = rhythmPreset.value === 'triplets'
+  const masterInterval = isTriplet ? '8t'  : '16n'
+  const masterSteps    = isTriplet ? 12    : 16
+  const cfg            = CHORD_RHYTHM[rhythmPreset.value] ?? CHORD_RHYTHM.whole
+
+  _progIdx    = 0
+  _masterStep = 0
+  _barCount   = 0
+
+  isPlaying.value         = true
   currentPlayingIdx.value = 0
-  barProgress.value     = 0
-  activeChord.value     = progression.value[0] ?? null
+  barProgress.value       = 0
+  activeChord.value       = progression.value[0] ?? null
 
-  startDrums(rhythmPreset.value)
-
+  // ── Single master loop — drives both chord playback and drum hits ──────────
+  // Using the same `time` for both guarantees zero offset between kick and chord.
   _scheduleId = transport.scheduleRepeat((time) => {
     const prog = progression.value
     if (!prog.length) { stopPlayback(); return }
 
-    const idx   = _progIdx % prog.length
-    const step  = _step
-    const chord = prog[idx]
+    const step = _masterStep
+    const idx  = _progIdx
 
-    // Strike chord on first step of each slot (all rhythms) or every step for dense rhythms
-    audioPlayChord(chord, time, cfg.soundDuration)
-
-    // Advance step counter for next callback
-    const nextStep = step + 1
-    if (nextStep >= cfg.stepsPerBar) {
-      _step    = 0
-      _progIdx = (idx + 1) % prog.length
-    } else {
-      _step = nextStep
+    // ── Chord strike ──────────────────────────────────────────────────────────
+    if (step % cfg.stepsPerStrike === 0) {
+      audioPlayChord(prog[idx], time, cfg.soundDuration)
     }
 
-    // Sync UI to audio timeline
+    // ── Drum hit (same `time` = perfectly locked) ─────────────────────────────
+    drumTick(time, step, _barCount)
+
+    // ── UI sync (deferred to animation frame via Draw) ────────────────────────
     draw.schedule(() => {
       currentPlayingIdx.value = idx
-      barProgress.value = cfg.stepsPerBar > 1
-        ? Math.round(step / cfg.stepsPerBar * 100)
+      barProgress.value = masterSteps > 1
+        ? Math.round(step / masterSteps * 100)
         : 0
       if (step === 0) {
-        activeChord.value   = chord
-        fingeringChord.value = chord
+        activeChord.value    = prog[idx]
+        fingeringChord.value = prog[idx]
+      }
+
+      const nextStep = step + 1
+      if (nextStep >= masterSteps) {
+        _masterStep = 0
+        _barCount++
+        _progIdx = (idx + 1) % prog.length
+      } else {
+        _masterStep = nextStep
       }
     }, time)
-  }, cfg.interval)
+  }, masterInterval)
 
   transport.start()
 }
@@ -913,14 +942,17 @@ function stopPlayback() {
   const transport = Tone.getTransport()
   transport.stop()
   transport.cancel()
-  stopDrums()
-  _scheduleId      = null
-  _progIdx         = 0
-  _step            = 0
-  isPlaying.value  = false
-  barProgress.value = 0
-  activeChord.value = null
-  fingeringChord.value = null
+  transport.swing = 0
+
+  _scheduleId     = null
+  _progIdx        = 0
+  _masterStep     = 0
+  _barCount       = 0
+
+  isPlaying.value         = false
+  barProgress.value       = 0
+  activeChord.value       = null
+  fingeringChord.value    = null
   currentPlayingIdx.value = 0
 }
 
@@ -932,10 +964,20 @@ function setRhythm(value) {
 
 function handleRhythmModeChange(mode) {
   rhythmMode.value = mode
+
+  // Load kits if switching to a drum mode for the first time
+  if (mode !== 'off' && !drumsReady.value) initDrums()
+
+  // Update Transport swing immediately so the feel changes on the next tick
   if (isPlaying.value) {
-    // Hot-swap drums without stopping chord playback
-    stopDrums()
-    if (mode !== 'off') startDrums(rhythmPreset.value)
+    const transport = Tone.getTransport()
+    if (mode === 'swing') {
+      transport.swing = 0.5
+      transport.swingSubdivision = '8n'
+    } else {
+      transport.swing = 0
+    }
+    // drumTick reads rhythmMode.value reactively — pattern change is instant
   }
 }
 

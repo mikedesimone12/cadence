@@ -362,6 +362,11 @@
     >
       <v-icon>mdi-plus</v-icon>
     </v-btn>
+
+    <div class="text-center mt-4 mb-2" style="font-size:9px; opacity:0.2; line-height:1;">
+      BPM &amp; Key data by
+      <a href="https://getsongbpm.com" rel="noopener" target="_blank" style="color:inherit;">GetSongBPM</a>
+    </div>
   </v-container>
 
   <!-- Drill fullscreen overlay -->
