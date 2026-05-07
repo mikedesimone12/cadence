@@ -340,6 +340,30 @@
           <span class="rhythm-btn-desc">808, snap, 16ths</span>
         </div>
       </v-btn>
+      <v-btn value="fourOnFloor" class="rhythm-btn">
+        <div class="rhythm-btn-inner">
+          <span class="rhythm-btn-label">4 on Floor</span>
+          <span class="rhythm-btn-desc">Kick every beat</span>
+        </div>
+      </v-btn>
+      <v-btn value="funk" class="rhythm-btn">
+        <div class="rhythm-btn-inner">
+          <span class="rhythm-btn-label">Funk</span>
+          <span class="rhythm-btn-desc">Syncopated 16ths</span>
+        </div>
+      </v-btn>
+      <v-btn value="swing" class="rhythm-btn">
+        <div class="rhythm-btn-inner">
+          <span class="rhythm-btn-label">Swing</span>
+          <span class="rhythm-btn-desc">Triplet shuffle</span>
+        </div>
+      </v-btn>
+      <v-btn value="bossa" class="rhythm-btn">
+        <div class="rhythm-btn-inner">
+          <span class="rhythm-btn-label">Bossa</span>
+          <span class="rhythm-btn-desc">Brazilian groove</span>
+        </div>
+      </v-btn>
     </v-btn-toggle>
 
     <!-- Swing slider (hip-hop only) -->
@@ -1152,10 +1176,13 @@ onBeforeRouteLeave(() => {
 /* ── Rhythm toggle ───────────────────────────────────────────────────────── */
 .rhythm-toggle {
   width: 100%;
+  flex-wrap: wrap !important;
+  height: auto !important;
 }
 .rhythm-btn {
-  flex: 1 !important;
-  min-width: 0 !important;
+  flex: 1 1 0 !important;
+  min-width: calc(25% - 3px) !important;
+  max-width: 25% !important;
   height: auto !important;
   padding: 7px 3px !important;
   text-transform: none !important;
