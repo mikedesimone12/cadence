@@ -213,6 +213,16 @@ async function selectTrack(track) {
   }
 }
 
+function cleanTitle(title) {
+  return title
+    .replace(/\s*[-–]\s*(Remaster(ed)?(\s+\d{4})?)/gi, '')
+    .replace(/\s*[-–]\s*(Re-?master(ed)?(\s+\d{4})?)/gi, '')
+    .replace(/\s*\((Remaster(ed)?(\s+\d{4})?)\)/gi, '')
+    .replace(/\s*\((Live[^)]*)\)/gi, '')
+    .replace(/\s*\((Radio Edit)\)/gi, '')
+    .trim()
+}
+
 function handleImport() {
   if (!selectedTrack.value) return
 
@@ -222,7 +232,7 @@ function handleImport() {
   const keyType = isMinor ? 'minor' : 'major'
 
   emit('song-selected', {
-    title:         selectedTrack.value.title,
+    title:         cleanTitle(selectedTrack.value.title),
     artist:        selectedTrack.value.artist,
     key:           keyRoot,
     keyType:       keyType,
