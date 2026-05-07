@@ -322,6 +322,12 @@
           <span class="rhythm-btn-desc">Chords only</span>
         </div>
       </v-btn>
+      <v-btn value="simple" class="rhythm-btn">
+        <div class="rhythm-btn-inner">
+          <span class="rhythm-btn-label">Simple</span>
+          <span class="rhythm-btn-desc">Basic timekeeping</span>
+        </div>
+      </v-btn>
       <v-btn value="click" class="rhythm-btn">
         <div class="rhythm-btn-inner">
           <span class="rhythm-btn-label">Click</span>
@@ -332,6 +338,12 @@
         <div class="rhythm-btn-inner">
           <span class="rhythm-btn-label">Acoustic</span>
           <span class="rhythm-btn-desc">Kick, snare, hi-hat</span>
+        </div>
+      </v-btn>
+      <v-btn value="rock" class="rhythm-btn">
+        <div class="rhythm-btn-inner">
+          <span class="rhythm-btn-label">Rock</span>
+          <span class="rhythm-btn-desc">Straight ahead rock</span>
         </div>
       </v-btn>
       <v-btn value="hiphop" class="rhythm-btn">
@@ -1181,11 +1193,17 @@ onBeforeRouteLeave(() => {
 }
 .rhythm-btn {
   flex: 1 1 0 !important;
-  min-width: calc(25% - 3px) !important;
-  max-width: 25% !important;
+  min-width: calc(20% - 3px) !important;
+  max-width: 20% !important;
   height: auto !important;
   padding: 7px 3px !important;
   text-transform: none !important;
+}
+@media (max-width: 599px) {
+  .rhythm-btn {
+    min-width: calc(50% - 3px) !important;
+    max-width: 50% !important;
+  }
 }
 .rhythm-btn-inner {
   display: flex;

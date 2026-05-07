@@ -172,13 +172,21 @@ Hierarchy:
 - Save progression to song library
 - BPM slider + tap tempo
 - Chord rhythm presets (chips): Whole | 8ths | Triplets | 16ths
-- Drum machine (rhythm toggle, 4×2 grid):
-  Row 1: Off | Click | Acoustic | Hip-Hop
-  Row 2: 4 on Floor | Funk | Swing | Bossa
+- Drum machine (rhythm toggle, 2-row grid):
+  Row 1: Off | Simple | Click | Acoustic | Rock
+  Row 2: Hip-Hop | 4 on Floor | Funk | Swing | Bossa
+  Layout: 5 per row on desktop, 2 per row on mobile (≤599px)
   - Off: drums disabled, chords only
+  - Simple: kick on 1&3, snare on 2&4, no hi-hat;
+    MembraneSynth kick at 0.8 vel, NoiseSynth snare at 0.7;
+    uses PATTERNS (adapts to chord rhythm preset)
   - Click: MetalSynth woodblock, beat 1 accented
   - Acoustic: MembraneSynth kick, NoiseSynth snare (pink),
     MetalSynth hat; Freeverb room reverb
+  - Rock: heavy MembraneSynth kick (6 oct, pitchDecay 0.08),
+    white NoiseSynth snare (decay 0.10, hard crack),
+    MetalSynth 8th-note hats at consistent vel;
+    MetalSynth crash one-shot on pattern downbeat
   - Hip-Hop: MembraneSynth 808 boom kick, NoiseSynth snap
     snare, MetalSynth hat; user-adjustable swing slider
   - 4 on Floor: kick every beat, snare 2&4, eighth hats
@@ -227,15 +235,18 @@ Synths (all lazy-initialized after AudioContext starts):
 - _snareSynth:   NoiseSynth pink (decay 0.16)
 - _hihatSynth:   MetalSynth closed (decay 0.06)
 - _openHatSynth: MetalSynth open (decay 0.4)
-- _rideSynth:    MetalSynth (freq 600, decay 0.28) — Swing
-- _rimSynth:     NoiseSynth white (decay 0.035) — Bossa
+- _rideSynth:       MetalSynth (freq 600, decay 0.28) — Swing
+- _rimSynth:        NoiseSynth white (decay 0.035) — Bossa
+- _rockKickSynth:   MembraneSynth (6 oct, pitchDecay 0.08) — Rock
+- _rockSnareSynth:  NoiseSynth white (decay 0.10) — Rock
+- _crashSynth:      MetalSynth (freq 300, decay 0.8) — Rock one-shot
 All routed through: _gainNode → _reverb → destination
 Transport.swing is set to 0.5 for Swing mode, reset to 0
 on stopDrums() and when any other mode starts.
 PATTERNS object: fixed interval sub-patterns per rhythmPreset
-(whole/eighths/triplets/sixteenths) for click/acoustic/hiphop.
+(whole/eighths/triplets/sixteenths) for click/simple/acoustic/hiphop.
 FIXED_PATTERNS object: single 16n or 8n pattern per mode
-for fourOnFloor/funk/swing/bossa (independent of rhythmPreset).
+for fourOnFloor/funk/swing/bossa/rock (independent of rhythmPreset).
 
 ---
 

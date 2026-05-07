@@ -56,6 +56,37 @@ const PATTERNS = {
     },
   },
 
+  simple: {
+    whole: {
+      interval: '4n', steps: 4,
+      kick:    [1,0,1,0],
+      snare:   [0,1,0,1],
+      hat:     [0,0,0,0],
+      hatOpen: [0,0,0,0],
+    },
+    eighths: {
+      interval: '8n', steps: 8,
+      kick:    [1,0,0,0, 1,0,0,0],
+      snare:   [0,0,1,0, 0,0,1,0],
+      hat:     [0,0,0,0, 0,0,0,0],
+      hatOpen: [0,0,0,0, 0,0,0,0],
+    },
+    triplets: {
+      interval: '8t', steps: 12,
+      kick:    [1,0,0,0,0,0, 1,0,0,0,0,0],
+      snare:   [0,0,0,1,0,0, 0,0,0,1,0,0],
+      hat:     [0,0,0,0,0,0, 0,0,0,0,0,0],
+      hatOpen: [0,0,0,0,0,0, 0,0,0,0,0,0],
+    },
+    sixteenths: {
+      interval: '16n', steps: 16,
+      kick:    [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+      snare:   [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+      hat:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+      hatOpen: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    },
+  },
+
   hiphop: {
     whole: {
       interval: '4n', steps: 4,
@@ -119,9 +150,16 @@ const FIXED_PATTERNS = {
     rim: [1,0,1,0, 0,0,0,0, 1,0,1,0, 1,0,0,0],
     hat: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
   },
+  // Rock: heavy kick on 1&3, hard snare on 2&4, machine-tight 8th-note hats
+  rock: {
+    interval: '16n', steps: 16,
+    kick:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hat:   [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+  },
 }
 
-const FIXED_MODES = new Set(['fourOnFloor', 'funk', 'swing', 'bossa'])
+const FIXED_MODES = new Set(['fourOnFloor', 'funk', 'swing', 'bossa', 'rock'])
 
 // ── Tone.js nodes (lazy — created after AudioContext starts) ──────────────────
 let _gainNode     = null  // master gain for all drum synths
@@ -132,9 +170,12 @@ let _808Synth     = null  // MembraneSynth — 808-style boom kick
 let _snareSynth   = null  // NoiseSynth — snare
 let _hihatSynth   = null  // MetalSynth — closed hi-hat
 let _openHatSynth = null  // MetalSynth — open hi-hat
-let _rideSynth    = null  // MetalSynth — jazz ride cymbal
-let _rimSynth     = null  // NoiseSynth — bossa rim click
-let _initialized  = false
+let _rideSynth      = null  // MetalSynth — jazz ride cymbal
+let _rimSynth       = null  // NoiseSynth — bossa rim click
+let _rockKickSynth  = null  // MembraneSynth — rock kick (heavier, wider sweep)
+let _rockSnareSynth = null  // NoiseSynth — rock snare (white noise, hard crack)
+let _crashSynth     = null  // MetalSynth — rock crash cymbal (one-shot on start)
+let _initialized    = false
 
 function _init() {
   if (_initialized) return
@@ -208,6 +249,29 @@ function _init() {
     noise:    { type: 'white' },
     envelope: { attack: 0.001, decay: 0.035, sustain: 0, release: 0.01 },
   }).connect(_gainNode)
+
+  // Rock kick: wider pitch sweep (6 oct vs acoustic's 5), slightly shorter decay
+  _rockKickSynth = new Tone.MembraneSynth({
+    pitchDecay: 0.08,
+    octaves:    6,
+    envelope:   { attack: 0.001, decay: 0.4, sustain: 0, release: 0.1 },
+  }).connect(_gainNode)
+
+  // Rock snare: white noise (brighter than pink), short hard crack
+  _rockSnareSynth = new Tone.NoiseSynth({
+    noise:    { type: 'white' },
+    envelope: { attack: 0.001, decay: 0.10, sustain: 0, release: 0.03 },
+  }).connect(_gainNode)
+
+  // Rock crash: bright MetalSynth, long release, fired once at pattern start
+  _crashSynth = new Tone.MetalSynth({
+    frequency:       300,
+    envelope:        { attack: 0.001, decay: 0.8, sustain: 0, release: 0.5 },
+    harmonicity:     5.1,
+    modulationIndex: 16,
+    resonance:       4000,
+    octaves:         1.5,
+  }).connect(_gainNode)
 }
 
 watch(rhythmVolume, v => {
@@ -241,6 +305,14 @@ function startDrums(rhythmPreset) {
   if (!pat) return
 
   if (_reverb) _reverb.wet.value = mode === 'acoustic' ? 0.22 : 0
+
+  // Rock: fire crash cymbal once at transport time 0 (pattern downbeat)
+  if (mode === 'rock') {
+    const crashVel = Math.min(1, rhythmVolume.value / 100) * 0.3
+    transport.schedule((time) => {
+      _crashSynth.triggerAttackRelease(300, '2n', time, crashVel)
+    }, 0)
+  }
 
   _drumStep = 0
 
@@ -295,6 +367,19 @@ function startDrums(rhythmPreset) {
       if (pat.kick[step])  _kickSynth.triggerAttackRelease('C1', '8n', t, g * 0.9 * pat.kick[step])
       if (pat.snare[step]) _snareSynth.triggerAttackRelease('16n', t, g * 0.85 * pat.snare[step])
       if (pat.hat[step])   _hihatSynth.triggerAttackRelease(400, '64n', t, g * 0.55 * pat.hat[step])
+      return
+    }
+
+    if (mode === 'simple') {
+      if (pat.kick[step])  _kickSynth.triggerAttackRelease('C1', '8n', t, g * 0.8)
+      if (pat.snare[step]) _snareSynth.triggerAttackRelease('16n', t, g * 0.7)
+      return
+    }
+
+    if (mode === 'rock') {
+      if (pat.kick[step])  _rockKickSynth.triggerAttackRelease('C1', '8n', t, g * 1.0)
+      if (pat.snare[step]) _rockSnareSynth.triggerAttackRelease('16n', t, g * 0.9)
+      if (pat.hat[step])   _hihatSynth.triggerAttackRelease(400, '64n', t, g * 0.5)
       return
     }
 
