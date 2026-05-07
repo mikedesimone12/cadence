@@ -1122,7 +1122,6 @@ const importedAlbumArt = ref(null)
 const importedSpotifyId = ref(null)
 
 function handleSongImported(songData) {
-  // Map Spotify key root to the nearest KEY_ROOTS value (Spotify returns sharps)
   songForm.value.title    = songData.title
   songForm.value.artist   = songData.artist
   songForm.value.key_root = songData.key || null
@@ -1132,6 +1131,18 @@ function handleSongImported(songData) {
   importedSpotifyId.value = songData.spotifyId
   importDialogOpen.value  = false
   songDialog.value        = true
+
+  if (songData.featuresPending && songData.featuresPromise) {
+    songData.featuresPromise.then(f => {
+      if (!f || !songDialog.value) return
+      if (f.key) {
+        const isMinor = f.key.endsWith('m')
+        songForm.value.key_root = isMinor ? f.key.slice(0, -1) : f.key
+        songForm.value.key_type = isMinor ? 'minor' : 'major'
+      }
+      if (f.bpm) songForm.value.bpm = f.bpm
+    })
+  }
 }
 
 const blankForm = () => ({
