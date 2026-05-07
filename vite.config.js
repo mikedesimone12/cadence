@@ -14,10 +14,26 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vue-vendor': ['vue', 'vue-router'],
+          'vuetify': ['vuetify'],
+          'supabase': ['@supabase/supabase-js'],
+          'audio': ['tone', 'soundfont-player'],
+          'utils': ['dompurify'],
+        },
+      },
+    },
   },
   server: {
     proxy: {
       '/api': 'http://localhost:8080',
+    },
+    headers: {
+      'X-Frame-Options': 'DENY',
+      'X-Content-Type-Options': 'nosniff',
     },
   },
 })

@@ -13,6 +13,18 @@ supabase.auth.onAuthStateChange((_event, session) => {
   currentUser.value = session?.user ?? null
 })
 
+// Refresh session when user returns to a backgrounded tab
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', async () => {
+    if (!document.hidden) {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session && currentUser.value) {
+        currentUser.value = null
+      }
+    }
+  })
+}
+
 export function useAuth() {
   async function signInWithGoogle() {
     const { error } = await supabase.auth.signInWithOAuth({

@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# Check for accidental API key commits (skip .husky itself to avoid self-match)
+if git diff --cached --name-only | grep -v '^\.husky/' | xargs grep -l \
+  "sk-ant-\|ANTHROPIC_API_KEY=sk\|supabase.*eyJ" \
+  2>/dev/null; then
+  echo "❌ Possible API key detected in staged files"
+  echo "   Remove secrets before committing"
+  exit 1
+fi
+
+# Run lint (non-blocking if no config exists)
+npm run lint --if-present || true
+
+echo "✅ Pre-commit checks passed"

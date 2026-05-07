@@ -71,6 +71,7 @@
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuth } from './composables/useAuth'
+import { supabase } from './lib/supabase'
 import AuthModal from './components/AuthModal.vue'
 
 const route    = useRoute()
@@ -88,6 +89,13 @@ const userLabel = computed(() => {
 async function handleSignOut() {
   await signOut()
 }
+
+// Clear cached auth state on unexpected sign-out (e.g. token revoked server-side)
+supabase.auth.onAuthStateChange((event) => {
+  if (event === 'SIGNED_OUT') {
+    currentUser.value = null
+  }
+})
 </script>
 
 <style>

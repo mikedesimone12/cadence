@@ -904,6 +904,8 @@ import { progressionToNNS, noteToSharp, musicalKeys, transposeProgression, getCa
 import { useAudio } from '../composables/useAudio'
 import AuthModal from '../components/AuthModal.vue'
 import ChordVisualizer from '../components/ChordVisualizer.vue'
+import { sanitizeText, sanitizeChord } from '../utils/sanitize'
+import { validateBPM, validateText, validateChordChart } from '../utils/validate'
 
 defineOptions({ name: 'GigView' })
 
@@ -992,13 +994,19 @@ async function saveSetlist() {
   if (!newSetlist.value.name.trim()) return
   savingSetlist.value = true
   setlistError.value = ''
+
+  const nameVal = validateText(newSetlist.value.name, 'Setlist name', 200)
+  if (!nameVal.valid) { setlistError.value = nameVal.error; savingSetlist.value = false; return }
+  const venueRaw = newSetlist.value.venue.trim()
+  if (venueRaw && venueRaw.length > 200) { setlistError.value = 'Venue must be under 200 characters'; savingSetlist.value = false; return }
+
   try {
     const { data, error } = await supabase
       .from('setlists')
       .insert({
         user_id: currentUser.value.id,
-        name:    newSetlist.value.name.trim(),
-        venue:   newSetlist.value.venue.trim() || null,
+        name:    sanitizeText(newSetlist.value.name),
+        venue:   venueRaw ? sanitizeText(venueRaw) : null,
         gig_date: newSetlist.value.gig_date     || null,
       })
       .select()
@@ -1178,6 +1186,22 @@ async function saveSong() {
   if (!songForm.value.title.trim()) return
   savingSong.value = true
   songFormError.value = ''
+
+  // Validate before write
+  const titleVal = validateText(songForm.value.title, 'Title', 200)
+  if (!titleVal.valid) { songFormError.value = titleVal.error; savingSong.value = false; return }
+
+  const artistRaw = songForm.value.artist.trim()
+  if (artistRaw) {
+    const artistVal = validateText(artistRaw, 'Artist', 200)
+    if (!artistVal.valid) { songFormError.value = artistVal.error; savingSong.value = false; return }
+  }
+
+  if (songForm.value.bpm) {
+    const bpmVal = validateBPM(songForm.value.bpm)
+    if (!bpmVal.valid) { songFormError.value = bpmVal.error; savingSong.value = false; return }
+  }
+
   try {
     const { key_root, key_type, chord_chart } = songForm.value
     const majorRoot = key_type === 'minor' ? getRelativeMajor(key_root) : noteToSharp(key_root)
@@ -1191,28 +1215,42 @@ async function saveSong() {
       sectionsPayload = songFormSections.value
         .filter(s => s.name.trim() && s.chord_chart_str.trim())
         .map((s, i) => {
-          const chords = s.chord_chart_str.split(',').map(c => c.trim()).filter(Boolean)
+          const chords = s.chord_chart_str.split(',').map(c => sanitizeChord(c)).filter(Boolean)
           const nns = key_root ? progressionToNNS(chords, majorRoot).map(n => n ?? '?') : []
-          return { id: s.id, name: s.name.trim(), order: i, chord_chart: chords, nns_chart: nns, notes: s.notes.trim() }
+          return { id: s.id, name: sanitizeText(s.name), order: i, chord_chart: chords, nns_chart: nns, notes: sanitizeText(s.notes) }
         })
+
+      // Validate each section's chord chart
+      for (const sec of sectionsPayload) {
+        if (sec.chord_chart.length > 0) {
+          const chartVal = validateChordChart(sec.chord_chart)
+          if (!chartVal.valid) { songFormError.value = `Section "${sec.name}": ${chartVal.error}`; savingSong.value = false; return }
+        }
+      }
+
       formOrderPayload = [...songFormOrder.value]
       // Flatten unique chords for backward compat
       const allChords = [...new Set(sectionsPayload.flatMap(s => s.chord_chart))]
       topChords = allChords.length ? allChords : null
       topNNS    = topChords && key_root ? progressionToNNS(topChords, majorRoot).map(n => n ?? '?') : null
     } else {
-      topChords = chord_chart.trim() ? chord_chart.split(',').map(c => c.trim()).filter(Boolean) : null
+      const rawChords = chord_chart.trim() ? chord_chart.split(',').map(c => sanitizeChord(c)).filter(Boolean) : null
+      if (rawChords && rawChords.length > 0) {
+        const chartVal = validateChordChart(rawChords)
+        if (!chartVal.valid) { songFormError.value = chartVal.error; savingSong.value = false; return }
+      }
+      topChords = rawChords
       topNNS    = computeNNSChart(chord_chart, key_root, key_type)
     }
 
     const payload = {
-      title:       songForm.value.title.trim(),
-      artist:      songForm.value.artist.trim()  || null,
+      title:       sanitizeText(songForm.value.title),
+      artist:      artistRaw ? sanitizeText(artistRaw) : null,
       key:         keyFromForm(key_root, key_type),
-      bpm:         songForm.value.bpm            || null,
+      bpm:         songForm.value.bpm ? parseInt(songForm.value.bpm) : null,
       chord_chart: topChords,
       nns_chart:   topNNS,
-      notes:       songFormMode.value === 'simple' ? (songForm.value.notes.trim() || null) : null,
+      notes:       songFormMode.value === 'simple' ? (sanitizeText(songForm.value.notes) || null) : null,
       sections:    sectionsPayload,
       form_order:  formOrderPayload,
     }

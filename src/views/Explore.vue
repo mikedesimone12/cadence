@@ -563,6 +563,8 @@ import { useAudio } from '../composables/useAudio'
 import { useAuth } from '../composables/useAuth'
 import { supabase } from '../lib/supabase'
 import ChordVisualizer from '../components/ChordVisualizer.vue'
+import { sanitizeText, sanitizeChord } from '../utils/sanitize'
+import { validateText, validateBPM } from '../utils/validate'
 
 defineOptions({ name: 'ExploreView' })
 
@@ -636,18 +638,34 @@ async function saveProgression() {
   if (!saveForm.value.title.trim()) return
   savingProg.value = true
   saveError.value = ''
+
+  const titleVal = validateText(saveForm.value.title, 'Title', 200)
+  if (!titleVal.valid) { saveError.value = titleVal.error; savingProg.value = false; return }
+
+  const artistRaw = saveForm.value.artist.trim()
+  if (artistRaw) {
+    const artistVal = validateText(artistRaw, 'Artist', 200)
+    if (!artistVal.valid) { saveError.value = artistVal.error; savingProg.value = false; return }
+  }
+
+  if (saveForm.value.bpm) {
+    const bpmVal = validateBPM(saveForm.value.bpm)
+    if (!bpmVal.valid) { saveError.value = bpmVal.error; savingProg.value = false; return }
+  }
+
   try {
     const key = keyPairs.value[0]?.majorRoot ?? null
+    const sanitizedChords = selectedChordsSharp.value.map(c => sanitizeChord(c)).filter(Boolean)
     const nnsChart = key
-      ? progressionToNNS(selectedChordsSharp.value, key).map(n => n ?? '?')
+      ? progressionToNNS(sanitizedChords, key).map(n => n ?? '?')
       : null
     const { error } = await supabase.from('songs').insert({
       user_id:     currentUser.value.id,
-      title:       saveForm.value.title.trim(),
-      artist:      saveForm.value.artist.trim() || null,
-      bpm:         saveForm.value.bpm            || null,
+      title:       sanitizeText(saveForm.value.title),
+      artist:      artistRaw ? sanitizeText(artistRaw) : null,
+      bpm:         saveForm.value.bpm ? parseInt(saveForm.value.bpm) : null,
       key,
-      chord_chart: selectedChordsSharp.value,
+      chord_chart: sanitizedChords,
       nns_chart:   nnsChart,
     })
     if (error) throw error
@@ -956,12 +974,9 @@ async function explain(modifier = null) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        system:
-          "You are a knowledgeable musician talking to a friend — not a professor writing a textbook. " +
-          "When someone shows you a chord progression, explain in 2–4 warm, conversational sentences " +
-          "why it sounds the way it does: the emotional feel, the tension and resolution, or why it's " +
-          "satisfying. Mention the key. Drop theory terms only if you immediately explain them in plain words.",
-        messages: [{ role: 'user', content: msg }],
+        chords: selectedChordsSharp.value,
+        key: keyPairs.value[0]?.majorRoot ?? null,
+        userMessage: msg,
       }),
     })
     if (!res.ok) throw new Error(`API error ${res.status}`)

@@ -444,6 +444,8 @@ import { useRhythm } from '../composables/useRhythm'
 import { useAuth }   from '../composables/useAuth'
 import { supabase } from '../lib/supabase'
 import ChordVisualizer from '../components/ChordVisualizer.vue'
+import { sanitizeText, sanitizeChord } from '../utils/sanitize'
+import { validateText } from '../utils/validate'
 
 defineOptions({ name: 'PlayView' })
 
@@ -767,19 +769,30 @@ async function saveProgression() {
   if (!saveForm.value.title.trim()) return
   savingProg.value = true
   saveError.value  = ''
+
+  const titleVal = validateText(saveForm.value.title, 'Title', 200)
+  if (!titleVal.valid) { saveError.value = titleVal.error; savingProg.value = false; return }
+
+  const artistRaw = saveForm.value.artist.trim()
+  if (artistRaw) {
+    const artistVal = validateText(artistRaw, 'Artist', 200)
+    if (!artistVal.valid) { saveError.value = artistVal.error; savingProg.value = false; return }
+  }
+
   try {
     const key = selectedKey.value + (keyType.value === 'minor' ? 'm' : '')
     const majorRoot = keyType.value === 'minor' ? relativeMajorRoot.value : selectedKey.value
-    const nnsChart = progression.value.length
-      ? progressionToNNS(progression.value, majorRoot).map(n => n ?? '?')
+    const sanitizedChords = progression.value.map(c => sanitizeChord(c)).filter(Boolean)
+    const nnsChart = sanitizedChords.length
+      ? progressionToNNS(sanitizedChords, majorRoot).map(n => n ?? '?')
       : null
     const { error } = await supabase.from('songs').insert({
       user_id:     currentUser.value.id,
-      title:       saveForm.value.title.trim(),
-      artist:      saveForm.value.artist.trim() || null,
+      title:       sanitizeText(saveForm.value.title),
+      artist:      artistRaw ? sanitizeText(artistRaw) : null,
       bpm:         bpm.value  || null,
       key,
-      chord_chart: progression.value,
+      chord_chart: sanitizedChords,
       nns_chart:   nnsChart,
     })
     if (error) throw error
