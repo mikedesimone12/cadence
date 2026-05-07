@@ -61,7 +61,15 @@
       <!-- ════════════════════════════════════════════════════════════════════
            SECTION 1 — SAVED SONGS
            ════════════════════════════════════════════════════════════════════ -->
-      <div class="section-title">Saved Songs</div>
+      <div class="d-flex align-center mb-1">
+        <div class="section-title mb-0">Saved Songs</div>
+        <v-chip
+          v-if="spotifyImportCount > 0"
+          size="x-small" variant="tonal" color="success"
+          class="ml-2"
+          prepend-icon="mdi-spotify"
+        >{{ spotifyImportCount }} from Spotify</v-chip>
+      </div>
 
       <!-- Search -->
       <v-text-field
@@ -981,6 +989,10 @@ function computeAchievements(songList, sessionList, slCount) {
 }
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
+
+const spotifyImportCount = computed(() =>
+  songs.value.filter(s => s.spotify_id).length
+)
 
 const filteredSongs = computed(() => {
   let list = songs.value

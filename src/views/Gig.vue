@@ -686,6 +686,12 @@
   <!-- AuthModal (always mounted) -->
   <AuthModal v-model="authOpen" />
 
+  <!-- Spotify import dialog -->
+  <SongImportDialog
+    v-model="importDialogOpen"
+    @song-selected="handleSongImported"
+  />
+
   <!-- Song form dialog -->
   <v-dialog v-model="songDialog" max-width="540" :persistent="savingSong" scrollable>
     <v-card>
@@ -693,6 +699,37 @@
         {{ editingSong ? 'Edit Song' : 'New Song' }}
       </v-card-title>
       <v-card-text class="px-5 pt-4">
+
+        <!-- Spotify import button -->
+        <div class="mb-4">
+          <v-btn
+            variant="outlined" color="secondary"
+            prepend-icon="mdi-spotify"
+            block
+            @click="importDialogOpen = true"
+          >Find on Spotify</v-btn>
+        </div>
+
+        <!-- Imported song indicator -->
+        <div
+          v-if="importedAlbumArt"
+          class="d-flex align-center mb-4 imported-indicator pa-2"
+        >
+          <v-avatar size="32" rounded="md" class="mr-2">
+            <v-img :src="importedAlbumArt" />
+          </v-avatar>
+          <span class="text-caption text-medium-emphasis">
+            Imported from Spotify — add chord chart below
+          </span>
+          <v-btn
+            icon size="x-small" variant="text"
+            class="ml-auto"
+            @click="importedAlbumArt = null; importedSpotifyId = null"
+          >
+            <v-icon size="14">mdi-close</v-icon>
+          </v-btn>
+        </div>
+
         <!-- Mode toggle -->
         <v-btn-toggle
           v-model="songFormMode"
@@ -861,7 +898,7 @@
       </v-card-text>
       <v-card-actions class="px-5 pb-4 pt-0">
         <v-spacer />
-        <v-btn variant="text" size="small" color="secondary" @click="songDialog = false">Cancel</v-btn>
+        <v-btn variant="text" size="small" color="secondary" @click="songDialog = false; importedAlbumArt = null; importedSpotifyId = null">Cancel</v-btn>
         <v-btn
           color="primary" variant="flat" size="small"
           :loading="savingSong"
@@ -904,6 +941,7 @@ import { progressionToNNS, noteToSharp, musicalKeys, transposeProgression, getCa
 import { useAudio } from '../composables/useAudio'
 import AuthModal from '../components/AuthModal.vue'
 import ChordVisualizer from '../components/ChordVisualizer.vue'
+import SongImportDialog from '../components/SongImportDialog.vue'
 import { sanitizeText, sanitizeChord } from '../utils/sanitize'
 import { validateBPM, validateText, validateChordChart } from '../utils/validate'
 
@@ -1075,10 +1113,26 @@ async function loadSongs() {
 watch(() => selectedSetlist.value?.id, loadSongs)
 
 // ── Song form ─────────────────────────────────────────────────────────────────
-const songDialog    = ref(false)
-const editingSong   = ref(null)
-const songFormError = ref('')
-const savingSong    = ref(false)
+const songDialog       = ref(false)
+const editingSong      = ref(null)
+const songFormError    = ref('')
+const savingSong       = ref(false)
+const importDialogOpen = ref(false)
+const importedAlbumArt = ref(null)
+const importedSpotifyId = ref(null)
+
+function handleSongImported(songData) {
+  // Map Spotify key root to the nearest KEY_ROOTS value (Spotify returns sharps)
+  songForm.value.title    = songData.title
+  songForm.value.artist   = songData.artist
+  songForm.value.key_root = songData.key || null
+  songForm.value.key_type = songData.keyType || 'major'
+  songForm.value.bpm      = songData.bpm || null
+  importedAlbumArt.value  = songData.albumArt
+  importedSpotifyId.value = songData.spotifyId
+  importDialogOpen.value  = false
+  songDialog.value        = true
+}
 
 const blankForm = () => ({
   title: '', artist: '', key_root: null, key_type: 'major',
@@ -1253,6 +1307,8 @@ async function saveSong() {
       notes:       songFormMode.value === 'simple' ? (sanitizeText(songForm.value.notes) || null) : null,
       sections:    sectionsPayload,
       form_order:  formOrderPayload,
+      ...(importedSpotifyId.value ? { spotify_id: importedSpotifyId.value } : {}),
+      ...(importedAlbumArt.value  ? { album_art:  importedAlbumArt.value  } : {}),
     }
 
     if (editingSong.value) {
@@ -1276,7 +1332,9 @@ async function saveSong() {
     }
 
     await loadSongs()
-    songDialog.value = false
+    songDialog.value        = false
+    importedAlbumArt.value  = null
+    importedSpotifyId.value = null
   } catch (e) {
     songFormError.value = e.message
   } finally {
@@ -1827,11 +1885,14 @@ onMounted(()   => { if (currentUser.value) loadSetlists() })
 onActivated(() => { if (currentUser.value) loadSetlists() })
 
 onBeforeRouteLeave(() => {
-  drillOpen.value      = false
-  songDialog.value     = false
-  deleteDialog.value   = false
-  newSetlistOpen.value = false
-  authOpen.value       = false
+  drillOpen.value         = false
+  songDialog.value        = false
+  importDialogOpen.value  = false
+  importedAlbumArt.value  = null
+  importedSpotifyId.value = null
+  deleteDialog.value      = false
+  newSetlistOpen.value    = false
+  authOpen.value          = false
 })
 
 watch(currentUser, user => {
@@ -1849,6 +1910,12 @@ watch(currentUser, user => {
 <style scoped>
 .panel-title {
   font-family: 'Space Grotesk', sans-serif;
+}
+
+.imported-indicator {
+  background: rgba(200, 169, 110, 0.06);
+  border: 1px solid rgba(200, 169, 110, 0.2);
+  border-radius: 8px;
 }
 
 /* section-title class from global.css is also applied */
