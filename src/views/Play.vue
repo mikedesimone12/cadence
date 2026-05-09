@@ -2,7 +2,7 @@
   <v-container fluid class="pb-8 px-3">
 
     <!-- ── Page header ────────────────────────────────────────────────────── -->
-    <v-row align="center" class="mb-6" no-gutters>
+    <v-row align="center" class="mb-4" no-gutters>
       <v-col>
         <div class="page-title">Play</div>
         <div class="text-caption text-medium-emphasis">Pick a key · Tap chords</div>
@@ -18,6 +18,20 @@
         </div>
       </v-col>
     </v-row>
+
+    <!-- ── Mode toggle ────────────────────────────────────────────────────── -->
+    <v-btn-toggle
+      v-model="playMode"
+      mandatory density="compact" variant="outlined" color="primary"
+      class="mb-5" style="width: 100%"
+    >
+      <v-btn value="simple" style="flex: 1">
+        <v-icon size="15" class="mr-1">mdi-repeat</v-icon>Loop
+      </v-btn>
+      <v-btn value="chart" style="flex: 1">
+        <v-icon size="15" class="mr-1">mdi-view-grid-outline</v-icon>Chart
+      </v-btn>
+    </v-btn-toggle>
 
     <!-- ── Settings dialog ───────────────────────────────────────────────── -->
     <v-dialog v-model="settingsOpen" max-width="320">
@@ -125,7 +139,10 @@
       </v-btn>
     </div>
 
-    <!-- ── Progression builder ───────────────────────────────────────────── -->
+    <!-- ══ LOOP MODE ══════════════════════════════════════════════════════ -->
+    <template v-if="playMode === 'simple'">
+
+    <!-- ── Progression builder ─────────────────────────────────────────── -->
     <div class="section-title">Progression</div>
 
     <!-- Section selector chips (shown when a multi-section song is loaded) -->
@@ -271,13 +288,103 @@
       </div>
     </v-expand-transition>
 
-    <!-- ── Capo suggestion ───────────────────────────────────────────────── -->
+    <!-- ── Capo suggestion ─────────────────────────────────────────────── -->
     <div v-if="capoSuggestion" class="d-flex align-center mt-2 mb-1 capo-row">
       <v-icon size="13" color="medium-emphasis" class="mr-1">mdi-guitar-electric</v-icon>
       <span class="text-caption text-medium-emphasis">
         Guitar shortcut: play {{ toDisplayNote(capoSuggestion.playKey) }} shapes with capo {{ capoSuggestion.fret }}
       </span>
     </div>
+
+    </template><!-- /loop mode -->
+
+    <!-- ══ CHART MODE ═════════════════════════════════════════════════════ -->
+    <template v-else>
+
+      <!-- Header: section title + time sig + draft indicator -->
+      <div class="d-flex align-center mb-3">
+        <div class="section-title" style="margin-bottom:0">Chart</div>
+        <v-spacer />
+        <v-btn-toggle
+          v-model="timeSignature"
+          mandatory density="compact" variant="outlined" color="secondary"
+          style="height:28px"
+        >
+          <v-btn :value="4" style="min-width:38px;font-size:0.72rem;padding:0 8px">4/4</v-btn>
+          <v-btn :value="3" style="min-width:38px;font-size:0.72rem;padding:0 8px">3/4</v-btn>
+        </v-btn-toggle>
+        <span v-if="draftSaved" class="text-caption ml-3" style="color:#6E8EAD;opacity:0.8">Saved</span>
+      </div>
+
+      <!-- Empty state -->
+      <div v-if="!chartBars.length" class="chart-empty-state mb-4">
+        <v-icon size="36" color="medium-emphasis" class="mb-2">mdi-table-plus</v-icon>
+        <div class="text-body-2 text-medium-emphasis mb-3">Add bars to build your chart</div>
+        <v-btn color="primary" variant="flat" size="small" prepend-icon="mdi-plus" @click="addChartBar">
+          Add Bar
+        </v-btn>
+      </div>
+
+      <!-- Chart grid -->
+      <div v-else class="chart-grid mb-3">
+        <div
+          v-for="(bar, barIdx) in chartBars"
+          :key="bar.id"
+          :ref="el => { if (el) chartRowRefs[barIdx] = el }"
+          class="chart-bar"
+          :class="{ 'chart-bar--active': isPlaying && chartPosition.bar === barIdx }"
+        >
+          <span class="chart-bar-num">{{ barIdx + 1 }}</span>
+          <div class="chart-beats">
+            <div
+              v-for="(beat, beatIdx) in bar.beats"
+              :key="beatIdx"
+              class="chart-beat"
+              :class="{
+                'chart-beat--filled':  !!beat.chord,
+                'chart-beat--active':  isPlaying && chartPosition.bar === barIdx && chartPosition.beat === beatIdx,
+                'chart-beat--target':  pickerTarget && pickerTarget.barIdx === barIdx && pickerTarget.beatIdx === beatIdx,
+              }"
+              @click="openPicker(barIdx, beatIdx)"
+            >
+              <span v-if="beat.chord" class="chart-beat-name">{{ toDisplay(beat.chord) }}</span>
+              <v-icon v-else size="13" color="medium-emphasis">mdi-plus</v-icon>
+            </div>
+          </div>
+          <v-btn icon size="x-small" variant="text" style="flex-shrink:0;opacity:0.4;margin-left:4px" @click="removeChartBar(barIdx)">
+            <v-icon size="14">mdi-close</v-icon>
+          </v-btn>
+        </div>
+      </div>
+
+      <!-- Add bar + load from song + clear -->
+      <div class="d-flex align-center mb-4" style="gap:8px">
+        <v-btn variant="outlined" size="small" color="primary" prepend-icon="mdi-plus" @click="addChartBar">
+          Add Bar
+        </v-btn>
+        <v-menu v-if="currentUser" v-model="chartSongMenuOpen" :close-on-content-click="false" max-height="320">
+          <template #activator="{ props }">
+            <v-btn v-bind="props" variant="text" size="small" color="secondary" prepend-icon="mdi-playlist-music-outline" :loading="loadingSongs" @click="fetchUserSongs">
+              Load song
+            </v-btn>
+          </template>
+          <v-list density="compact" min-width="240">
+            <v-list-item v-if="!userSongs.length && !loadingSongs" disabled>
+              <v-list-item-title class="text-caption text-medium-emphasis">No songs with chord charts</v-list-item-title>
+            </v-list-item>
+            <v-list-item v-for="song in userSongs" :key="song.id" @click="loadChartFromSong(song); chartSongMenuOpen = false">
+              <v-list-item-title class="text-body-2">{{ song.title }}</v-list-item-title>
+              <v-list-item-subtitle v-if="song.artist" class="text-caption">{{ song.artist }}</v-list-item-subtitle>
+            </v-list-item>
+          </v-list>
+        </v-menu>
+        <v-spacer />
+        <v-btn v-if="chartBars.length" variant="text" size="x-small" color="error" @click="clearChartConfirmOpen = true">
+          Clear chart
+        </v-btn>
+      </div>
+
+    </template><!-- /chart mode -->
 
     <!-- ── Playback controls ─────────────────────────────────────────────── -->
     <div class="section-title mt-5">Playback</div>
@@ -297,8 +404,8 @@
       >Tap</v-btn>
     </div>
 
-    <!-- Rhythm presets -->
-    <div class="d-flex flex-wrap mb-5" style="gap: 10px">
+    <!-- Rhythm presets (loop mode only — chart mode always plays one chord per beat) -->
+    <div v-if="playMode === 'simple'" class="d-flex flex-wrap mb-5" style="gap: 10px">
       <v-chip
         v-for="r in RHYTHM_OPTIONS" :key="r.value"
         :color="rhythmPreset === r.value ? 'primary' : undefined"
@@ -395,12 +502,22 @@
 
     <!-- Current / next chord display (while playing) -->
     <v-expand-transition>
-      <div v-if="isPlaying && currentChord" class="playback-display mb-4">
-        <div class="playing-chord-name">{{ toDisplay(currentChord) }}</div>
-        <div v-if="nextChord !== currentChord" class="next-chord-hint">
-          next: {{ toDisplay(nextChord) }}
-        </div>
-        <div v-if="rhythmPreset !== 'whole'" class="bar-progress-track mt-2">
+      <div v-if="isPlaying" class="playback-display mb-4">
+        <template v-if="playMode === 'chart'">
+          <div class="playing-chord-name">
+            {{ chartCurrentChord ? toDisplay(chartCurrentChord) : '—' }}
+          </div>
+          <div v-if="chartNextChord" class="next-chord-hint">
+            next: {{ toDisplay(chartNextChord) }}
+          </div>
+        </template>
+        <template v-else>
+          <div v-if="currentChord" class="playing-chord-name">{{ toDisplay(currentChord) }}</div>
+          <div v-if="nextChord !== currentChord" class="next-chord-hint">
+            next: {{ toDisplay(nextChord) }}
+          </div>
+        </template>
+        <div v-if="playMode === 'simple' && rhythmPreset !== 'whole'" class="bar-progress-track mt-2">
           <div class="bar-progress-fill" :style="{ width: barProgress + '%' }" />
         </div>
       </div>
@@ -411,7 +528,7 @@
       <v-btn
         v-if="!isPlaying"
         color="primary" variant="flat"
-        :disabled="!progression.length || !isAudible"
+        :disabled="!canPlay"
         icon
         style="width: 64px; height: 64px; border-radius: 50%;"
         @click="startPlayback"
@@ -468,10 +585,76 @@
       </v-card-actions>
     </v-card>
   </v-dialog>
+
+  <!-- Clear chart confirm -->
+  <v-dialog v-model="clearChartConfirmOpen" max-width="300">
+    <v-card>
+      <v-card-title class="text-body-1 pt-4 px-4">Clear chart?</v-card-title>
+      <v-card-text class="px-4 py-2 text-body-2 text-medium-emphasis">
+        All bars and chords will be removed.
+      </v-card-text>
+      <v-card-actions class="px-4 pb-3">
+        <v-spacer />
+        <v-btn variant="text" size="small" @click="clearChartConfirmOpen = false">Cancel</v-btn>
+        <v-btn color="error" variant="flat" size="small" @click="clearChart">Clear</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Chord picker bottom sheet -->
+  <v-bottom-sheet v-model="pickerOpen" :scrim="true" max-width="600">
+    <v-card rounded="t-lg">
+      <v-card-title class="text-body-1 pt-4 pb-2 px-4 d-flex align-center">
+        <span>Pick a chord</span>
+        <span v-if="pickerTarget" class="text-caption text-medium-emphasis ml-2">
+          — Bar {{ pickerTarget.barIdx + 1 }}, Beat {{ pickerTarget.beatIdx + 1 }}
+        </span>
+        <v-spacer />
+        <v-btn icon size="x-small" variant="text" @click="pickerOpen = false">
+          <v-icon size="16">mdi-close</v-icon>
+        </v-btn>
+      </v-card-title>
+      <v-card-text class="px-3 pt-0 pb-5">
+        <div class="picker-grid">
+          <div
+            v-for="item in displayChords" :key="item.chord"
+            class="picker-tile"
+            :class="{
+              'picker-tile--tonic':  item.isTonic,
+              'picker-tile--minor':  !item.isTonic && item.chord.endsWith('m') && !item.chord.endsWith('dim'),
+              'picker-tile--dim':    item.chord.endsWith('dim'),
+            }"
+            @click="assignChartBeat(item.chord)"
+          >
+            <div class="picker-tile-nns">{{ item.nns }}</div>
+            <div class="picker-tile-name">{{ toDisplay(item.chord) }}</div>
+          </div>
+          <div class="picker-tile picker-tile--rest" @click="assignChartBeat(null)">
+            <div class="picker-tile-nns">—</div>
+            <div class="picker-tile-name">Rest</div>
+          </div>
+        </div>
+        <div v-if="pickerTarget && chartBars[pickerTarget?.barIdx]?.beats[pickerTarget?.beatIdx]?.chord" class="text-center mt-3">
+          <v-btn variant="text" size="small" color="error" @click="clearChartBeat(pickerTarget.barIdx, pickerTarget.beatIdx); pickerOpen = false">
+            Clear this beat
+          </v-btn>
+        </div>
+      </v-card-text>
+    </v-card>
+  </v-bottom-sheet>
+
+  <!-- First-time hint -->
+  <v-snackbar v-model="showHint" location="bottom" :timeout="4000" color="secondary" rounded="lg">
+    <v-icon size="16" class="mr-1">mdi-information-outline</v-icon>
+    Tap a beat cell to assign a chord. Tap a filled cell to change it.
+    <template #actions>
+      <v-btn variant="text" size="small" @click="showHint = false">Got it</v-btn>
+    </template>
+  </v-snackbar>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onActivated, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onActivated, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import * as Tone from 'tone'
 import { musicalKeys, noteToSharp, getCapoSuggestion, chordToNNS, progressionToNNS } from '@/core/musicTheory.js'
@@ -560,6 +743,23 @@ let _masterStep  = 0
 let _barCount    = 0
 let _scheduleId  = null
 
+// ─── Mode + Chart state ───────────────────────────────────────────────────────
+
+const playMode           = ref('simple')      // 'simple' | 'chart'
+const timeSignature      = ref(4)             // 4 or 3
+const chartBars          = ref([])            // [{ id, beats: [{ chord }] }]
+const pickerOpen         = ref(false)
+const pickerTarget       = ref(null)          // { barIdx, beatIdx }
+const chartPosition      = ref({ bar: 0, beat: 0 })
+const draftSaved         = ref(false)
+const clearChartConfirmOpen = ref(false)
+const chartSongMenuOpen  = ref(false)
+const hintSeen           = ref(localStorage.getItem('cadence_chart_hint_seen') === 'true')
+const showHint           = ref(false)
+const chartRowRefs       = []
+let _chartBar            = 0
+let _draftTimer          = null
+
 // ─── Audio ───────────────────────────────────────────────────────────────────
 
 const {
@@ -580,6 +780,7 @@ onMounted(() => {
   fingeringChord.value = null
   if (isAudible.value) loadInstruments()
   if (rhythmMode.value !== 'off') initDrums()
+  loadChartDraft()
   applyHistoryState()
 })
 onActivated(() => {
@@ -597,6 +798,28 @@ watch(isAudible, v => { if (v && !isLoaded.value) loadInstruments() })
 
 // Keep Transport BPM in sync with slider
 watch(bpm, v => { Tone.getTransport().bpm.value = v })
+
+// Resize all bar beats when time signature changes
+watch(timeSignature, (newSig) => {
+  if (isPlaying.value) stopPlayback()
+  chartBars.value = chartBars.value.map(bar => {
+    const beats = [...bar.beats]
+    while (beats.length < newSig) beats.push({ chord: null })
+    beats.length = newSig
+    return { ...bar, beats }
+  })
+})
+
+// Draft autosave — debounced 500ms
+watch([chartBars, timeSignature], () => {
+  clearTimeout(_draftTimer)
+  _draftTimer = setTimeout(saveChartDraft, 500)
+}, { deep: true })
+
+// Auto-scroll active bar into view during chart playback
+watch(() => chartPosition.value.bar, (newBar) => {
+  nextTick(() => { chartRowRefs[newBar]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) })
+})
 
 // ─── Display helpers ─────────────────────────────────────────────────────────
 
@@ -643,6 +866,32 @@ const displayChords = computed(() => {
 const capoSuggestion = computed(() => {
   const key = keyType.value === 'minor' ? relativeMajorRoot.value : selectedKey.value
   return getCapoSuggestion(key)
+})
+
+// ─── Chart computed ───────────────────────────────────────────────────────────
+
+const hasChartChords = computed(() =>
+  chartBars.value.some(bar => bar.beats.some(b => b.chord))
+)
+
+const canPlay = computed(() =>
+  isAudible.value && (playMode.value === 'chart' ? hasChartChords.value : progression.value.length > 0)
+)
+
+const chartCurrentChord = computed(() => {
+  if (!isPlaying.value || playMode.value !== 'chart') return null
+  const bar = chartBars.value[chartPosition.value.bar]
+  return bar?.beats[chartPosition.value.beat]?.chord ?? null
+})
+
+const chartNextChord = computed(() => {
+  if (!isPlaying.value || playMode.value !== 'chart') return null
+  const bars = chartBars.value
+  if (!bars.length) return null
+  const { bar, beat } = chartPosition.value
+  let nb = bar, nbt = beat + 1
+  if (nbt >= (bars[nb]?.beats.length ?? 0)) { nb = (bar + 1) % bars.length; nbt = 0 }
+  return bars[nb]?.beats[nbt]?.chord ?? null
 })
 
 // ─── Interaction ─────────────────────────────────────────────────────────────
@@ -844,6 +1093,115 @@ async function saveProgression() {
   }
 }
 
+// ─── Chart functions ──────────────────────────────────────────────────────────
+
+function createEmptyBar() {
+  return {
+    id:    crypto.randomUUID(),
+    beats: Array.from({ length: timeSignature.value }, () => ({ chord: null })),
+  }
+}
+
+function addChartBar() {
+  chartBars.value.push(createEmptyBar())
+  if (!hintSeen.value) {
+    hintSeen.value = true
+    localStorage.setItem('cadence_chart_hint_seen', 'true')
+    setTimeout(() => { showHint.value = true }, 300)
+  }
+}
+
+function removeChartBar(i) {
+  if (isPlaying.value) stopPlayback()
+  chartBars.value.splice(i, 1)
+}
+
+function clearChart() {
+  if (isPlaying.value) stopPlayback()
+  chartBars.value = []
+  clearChartConfirmOpen.value = false
+}
+
+function openPicker(barIdx, beatIdx) {
+  pickerTarget.value = { barIdx, beatIdx }
+  pickerOpen.value   = true
+  if (!hintSeen.value) {
+    hintSeen.value = true
+    localStorage.setItem('cadence_chart_hint_seen', 'true')
+  }
+}
+
+function assignChartBeat(chord) {
+  if (!pickerTarget.value) return
+  const { barIdx, beatIdx } = pickerTarget.value
+  chartBars.value[barIdx].beats[beatIdx].chord = chord
+
+  if (chord && isAudible.value && isLoaded.value) {
+    ensureContext().then(() => audioPlayChord(chord))
+  }
+
+  // Auto-advance to next empty beat
+  const bars = chartBars.value
+  let nb = barIdx, nbt = beatIdx + 1
+  while (nb < bars.length) {
+    if (nbt >= bars[nb].beats.length) { nb++; nbt = 0; continue }
+    if (!bars[nb].beats[nbt].chord) {
+      pickerTarget.value = { barIdx: nb, beatIdx: nbt }
+      return
+    }
+    nbt++
+  }
+  pickerOpen.value   = false
+  pickerTarget.value = null
+}
+
+function clearChartBeat(barIdx, beatIdx) {
+  chartBars.value[barIdx].beats[beatIdx].chord = null
+}
+
+function loadChartFromSong(song) {
+  if (isPlaying.value) stopPlayback()
+  if (!Array.isArray(song.chord_chart) || !song.chord_chart.length) return
+  const chords = song.chord_chart
+  const sig    = timeSignature.value
+  const newBars = []
+  for (let i = 0; i < chords.length; i += sig) {
+    const slice = chords.slice(i, i + sig)
+    newBars.push({
+      id:    crypto.randomUUID(),
+      beats: Array.from({ length: sig }, (_, j) => ({ chord: slice[j] ?? null })),
+    })
+  }
+  chartBars.value = newBars
+  if (song.bpm) bpm.value = Math.min(200, Math.max(40, song.bpm))
+  if (song.key) {
+    const isMinor = song.key.length > 1 && song.key.endsWith('m')
+    selectedKey.value = noteToSharp(isMinor ? song.key.slice(0, -1) : song.key)
+    keyType.value = isMinor ? 'minor' : 'major'
+  }
+}
+
+function saveChartDraft() {
+  try {
+    localStorage.setItem('cadence_chart_draft', JSON.stringify({
+      timeSignature: timeSignature.value,
+      bars: chartBars.value,
+    }))
+    draftSaved.value = true
+    setTimeout(() => { draftSaved.value = false }, 2000)
+  } catch {}
+}
+
+function loadChartDraft() {
+  try {
+    const raw = localStorage.getItem('cadence_chart_draft')
+    if (!raw) return
+    const d = JSON.parse(raw)
+    if (d.timeSignature === 3 || d.timeSignature === 4) timeSignature.value = d.timeSignature
+    if (Array.isArray(d.bars) && d.bars.length) chartBars.value = d.bars
+  } catch {}
+}
+
 // ─── Playback engine ─────────────────────────────────────────────────────────
 
 const currentChord = computed(() =>
@@ -857,10 +1215,8 @@ const nextChord = computed(() => {
 })
 
 async function startPlayback() {
-  if (!progression.value.length || !isAudible.value) return
+  if (!canPlay.value) return
   await ensureContext()
-
-  // Ensure drum kits are loading (fire-and-forget; drumTick guards !drumsReady)
   initDrums()
 
   const transport = Tone.getTransport()
@@ -870,34 +1226,67 @@ async function startPlayback() {
   transport.bpm.value = bpm.value
   transport.cancel()
 
-  // Configure Transport-level swing before scheduling
   if (mode === 'swing') {
     transport.swing = 0.5
     transport.swingSubdivision = '8n'
-  } else if (mode === 'funk') {
-    // Fine-grained funk swing handled manually inside drumTick; keep Transport clean
-    transport.swing = 0
   } else {
     transport.swing = 0
   }
 
-  // Triplets use 8t master grid (12 steps/bar); all other modes use 16n (16 steps/bar)
-  const isTriplet      = rhythmPreset.value === 'triplets'
-  const masterInterval = isTriplet ? '8t'  : '16n'
-  const masterSteps    = isTriplet ? 12    : 16
-  const cfg            = CHORD_RHYTHM[rhythmPreset.value] ?? CHORD_RHYTHM.whole
-
-  _progIdx    = 0
+  isPlaying.value   = true
+  barProgress.value = 0
   _masterStep = 0
   _barCount   = 0
 
-  isPlaying.value         = true
+  // ── CHART MODE ─────────────────────────────────────────────────────────────
+  if (playMode.value === 'chart') {
+    const masterSteps = timeSignature.value * 4
+    _chartBar = 0
+    chartPosition.value = { bar: 0, beat: 0 }
+
+    _scheduleId = transport.scheduleRepeat((time) => {
+      const bars = chartBars.value
+      if (!bars.length) { stopPlayback(); return }
+
+      const step   = _masterStep
+      const barIdx = _chartBar % bars.length
+      const beat   = Math.floor(step / 4)
+      const chord  = bars[barIdx]?.beats[beat]?.chord
+
+      if (step % 4 === 0 && chord) {
+        audioPlayChord(chord, time, 0.85)
+      }
+      drumTick(time, step, _barCount)
+
+      draw.schedule(() => {
+        chartPosition.value = { bar: barIdx, beat }
+        barProgress.value   = Math.round(step / masterSteps * 100)
+
+        const nextStep = step + 1
+        if (nextStep >= masterSteps) {
+          _masterStep = 0
+          _barCount++
+          _chartBar   = (_chartBar + 1) % chartBars.value.length
+        } else {
+          _masterStep = nextStep
+        }
+      }, time)
+    }, '16n')
+
+    transport.start()
+    return
+  }
+
+  // ── LOOP MODE ──────────────────────────────────────────────────────────────
+  const isTriplet      = rhythmPreset.value === 'triplets'
+  const masterInterval = isTriplet ? '8t' : '16n'
+  const masterSteps    = isTriplet ? 12   : 16
+  const cfg            = CHORD_RHYTHM[rhythmPreset.value] ?? CHORD_RHYTHM.whole
+
+  _progIdx = 0
   currentPlayingIdx.value = 0
-  barProgress.value       = 0
   activeChord.value       = progression.value[0] ?? null
 
-  // ── Single master loop — drives both chord playback and drum hits ──────────
-  // Using the same `time` for both guarantees zero offset between kick and chord.
   _scheduleId = transport.scheduleRepeat((time) => {
     const prog = progression.value
     if (!prog.length) { stopPlayback(); return }
@@ -905,20 +1294,14 @@ async function startPlayback() {
     const step = _masterStep
     const idx  = _progIdx
 
-    // ── Chord strike ──────────────────────────────────────────────────────────
     if (step % cfg.stepsPerStrike === 0) {
       audioPlayChord(prog[idx], time, cfg.soundDuration)
     }
-
-    // ── Drum hit (same `time` = perfectly locked) ─────────────────────────────
     drumTick(time, step, _barCount)
 
-    // ── UI sync (deferred to animation frame via Draw) ────────────────────────
     draw.schedule(() => {
       currentPlayingIdx.value = idx
-      barProgress.value = masterSteps > 1
-        ? Math.round(step / masterSteps * 100)
-        : 0
+      barProgress.value = masterSteps > 1 ? Math.round(step / masterSteps * 100) : 0
       if (step === 0) {
         activeChord.value    = prog[idx]
         fingeringChord.value = prog[idx]
@@ -944,16 +1327,18 @@ function stopPlayback() {
   transport.cancel()
   transport.swing = 0
 
-  _scheduleId     = null
-  _progIdx        = 0
-  _masterStep     = 0
-  _barCount       = 0
+  _scheduleId = null
+  _progIdx    = 0
+  _masterStep = 0
+  _barCount   = 0
+  _chartBar   = 0
 
   isPlaying.value         = false
   barProgress.value       = 0
   activeChord.value       = null
   fingeringChord.value    = null
   currentPlayingIdx.value = 0
+  chartPosition.value     = { bar: 0, beat: 0 }
 }
 
 function setRhythm(value) {
@@ -1004,9 +1389,12 @@ onBeforeUnmount(() => {
 
 onBeforeRouteLeave(() => {
   if (isPlaying.value) stopPlayback()
-  settingsOpen.value   = false
-  saveDialogOpen.value = false
-  songMenuOpen.value   = false
+  settingsOpen.value          = false
+  saveDialogOpen.value        = false
+  songMenuOpen.value          = false
+  pickerOpen.value            = false
+  clearChartConfirmOpen.value = false
+  chartSongMenuOpen.value     = false
 })
 </script>
 
@@ -1270,4 +1658,126 @@ onBeforeRouteLeave(() => {
 .v-btn--active .rhythm-btn-desc {
   opacity: 0.75;
 }
+
+/* ── Chart grid ─────────────────────────────────────────────────────────── */
+.chart-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 0 16px;
+  text-align: center;
+}
+.chart-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.chart-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.02);
+  transition: border-color 0.2s, background 0.2s;
+}
+.chart-bar--active {
+  border-color: rgba(200,169,110,0.4);
+  background: rgba(200,169,110,0.06);
+}
+.chart-bar-num {
+  font-family: 'Space Grotesk', monospace;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.25);
+  min-width: 18px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.chart-beats {
+  display: flex;
+  flex: 1;
+  gap: 5px;
+}
+.chart-beat {
+  flex: 1;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.02);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.1s, border-color 0.1s, transform 0.08s;
+}
+.chart-beat:active { transform: scale(0.93); }
+.chart-beat--filled {
+  background: rgba(200,169,110,0.10);
+  border-color: rgba(200,169,110,0.25);
+}
+.chart-beat--active {
+  background: rgba(200,169,110,0.22) !important;
+  border-color: #C8A96E !important;
+  box-shadow: 0 0 8px rgba(200,169,110,0.25);
+}
+.chart-beat--target {
+  border-color: rgba(110,142,173,0.6) !important;
+  background: rgba(110,142,173,0.10) !important;
+}
+.chart-beat-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #C8A96E;
+  letter-spacing: -0.02em;
+}
+
+/* ── Chord picker ────────────────────────────────────────────────────────── */
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.picker-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-left: 2px solid rgba(200,169,110,0.45);
+  background: rgba(200,169,110,0.08);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.1s, transform 0.08s;
+}
+.picker-tile:active { transform: scale(0.93); }
+.picker-tile--tonic  { background: rgba(200,169,110,0.18); border-left-color: #C8A96E; }
+.picker-tile--minor  { background: rgba(110,142,173,0.12); border-left-color: rgba(110,142,173,0.65); }
+.picker-tile--dim    { background: rgba(232,87,42,0.12);   border-left-color: rgba(232,87,42,0.65); }
+.picker-tile--rest   { background: rgba(255,255,255,0.04); border-left-color: rgba(255,255,255,0.15); }
+.picker-tile-nns {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #6E8EAD;
+  margin-bottom: 4px;
+}
+.picker-tile--tonic .picker-tile-nns { color: #C8A96E; }
+.picker-tile-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.0rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #C4C4BC;
+}
+.picker-tile--tonic .picker-tile-name { color: #C8A96E; }
 </style>
