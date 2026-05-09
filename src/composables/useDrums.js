@@ -38,6 +38,10 @@ const NOTES = {
 // ── 16-step drum patterns (one step = one 16th note) ─────────────────────────
 // Values: 0 = silent, 1 = full velocity, 0.0–1.0 = fractional (ghost notes)
 const PATTERNS = {
+  // Quarter notes only — steps 0,4,8,12 = beats 1,2,3,4
+  click: {
+    hihat: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
+  },
   simple: {
     kick:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
     snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
@@ -125,10 +129,12 @@ function drumTick(time, step, barCount) {
   const vel = VEL[mode] || {}
   const idx = step % 16
 
-  // ── Click / metronome ──────────────────────────────────────────────────────
+  // ── Click / metronome — quarter notes only, beat 1 accented ─────────────
   if (mode === 'click') {
-    const clickVel = g * (idx === 0 ? 1.0 : 0.55)
-    _hatKit?.play(NOTES.click, time, { gain: clickVel, duration: 0.05 })
+    if (PATTERNS.click.hihat[idx]) {
+      const clickVel = g * (idx === 0 ? 0.9 : 0.6)
+      _hatKit?.play(NOTES.click, time, { gain: clickVel, duration: 0.05 })
+    }
     return
   }
 
