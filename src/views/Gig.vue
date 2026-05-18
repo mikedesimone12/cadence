@@ -841,13 +841,10 @@
 
         <!-- ── Full form mode ─────────────────────────────────────────────── -->
         <template v-else>
-          <!-- Live form preview -->
-          <div v-if="formPreview" class="d-flex align-center flex-wrap mb-3" style="gap: 4px">
-            <span class="text-caption text-medium-emphasis" style="font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;flex-shrink:0">Form:</span>
-            <span style="font-size: 0.75rem; color: rgba(200,169,110,0.9)">{{ formPreview }}</span>
-          </div>
+          <!-- ── SECTION DEFINITIONS ──────────────────────────────────────── -->
+          <div class="section-label mb-2">Section Definitions</div>
 
-          <!-- Section cards -->
+          <!-- Section cards (no repeat stepper — repeats handled in form builder) -->
           <v-slide-y-transition group leave-absolute>
             <div
               v-for="(section, si) in songFormSections"
@@ -860,7 +857,7 @@
               @dragend="sectionDragSrcIdx = null; sectionDragOverIdx = null"
               :class="{ 'section-row--over': sectionDragOverIdx === si }"
             >
-              <!-- Header: drag + name + repeat stepper + delete -->
+              <!-- Header: drag + name + delete -->
               <div class="d-flex align-center mb-2" style="gap: 8px">
                 <v-icon size="16" color="medium-emphasis" style="cursor:grab;flex-shrink:0">mdi-drag-vertical</v-icon>
                 <v-combobox
@@ -870,15 +867,6 @@
                   variant="outlined" density="compact" hide-details
                   style="flex:1"
                 />
-                <div class="d-flex align-center" style="gap: 2px; flex-shrink: 0">
-                  <v-btn icon size="x-small" variant="text" :disabled="(section.repeats ?? 1) <= 1" @click="section.repeats = Math.max(1, (section.repeats ?? 1) - 1)">
-                    <v-icon size="14">mdi-minus</v-icon>
-                  </v-btn>
-                  <span style="font-size: 0.78rem; color: rgba(196,196,188,0.7); min-width: 22px; text-align: center">×{{ section.repeats ?? 1 }}</span>
-                  <v-btn icon size="x-small" variant="text" :disabled="(section.repeats ?? 1) >= 8" @click="section.repeats = Math.min(8, (section.repeats ?? 1) + 1)">
-                    <v-icon size="14">mdi-plus</v-icon>
-                  </v-btn>
-                </div>
                 <v-btn icon size="x-small" variant="text" color="error" @click="removeSection(si)">
                   <v-icon size="14">mdi-close</v-icon>
                 </v-btn>
@@ -947,12 +935,73 @@
             </div>
           </v-slide-y-transition>
 
-          <!-- Add Section dashed button -->
+          <!-- Add Section button -->
           <v-btn
             block variant="outlined" color="secondary" size="small"
-            prepend-icon="mdi-plus" class="add-section-btn mt-1"
+            prepend-icon="mdi-plus" class="add-section-btn mt-1 mb-4"
             @click="addSection"
           >{{ songFormSections.length ? 'Add Section' : 'Add your first section' }}</v-btn>
+
+          <!-- ── SONG FORM BUILDER ─────────────────────────────────────────── -->
+          <v-divider class="mb-3">
+            <span class="text-caption text-medium-emphasis px-2">Song Form</span>
+          </v-divider>
+
+          <!-- Empty: no sections defined yet -->
+          <div
+            v-if="!namedSections.length"
+            class="text-caption text-medium-emphasis text-center pa-3"
+            style="border: 1px dashed rgba(200,169,110,0.2); border-radius: 8px"
+          >
+            Add sections above first, then build your song form here
+          </div>
+
+          <template v-else>
+            <!-- Available section chips (tap to append to form) -->
+            <div class="text-caption text-medium-emphasis mb-2" style="font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase">
+              Available — tap to add
+            </div>
+            <div class="d-flex flex-wrap mb-3" style="gap: 6px">
+              <v-chip
+                v-for="section in namedSections"
+                :key="section.id"
+                size="small"
+                variant="tonal"
+                color="primary"
+                style="cursor:pointer"
+                @click="addToFormOrder(section.name)"
+              >{{ section.name }}</v-chip>
+            </div>
+
+            <!-- Form sequence -->
+            <div
+              v-if="!songFormOrder.length"
+              class="text-caption text-medium-emphasis text-center pa-3"
+              style="border: 1px dashed rgba(200,169,110,0.2); border-radius: 8px"
+            >
+              Tap section names above to build your performance order
+            </div>
+
+            <template v-else>
+              <div class="d-flex align-center flex-wrap mb-2" style="gap: 4px">
+                <template v-for="(name, fi) in songFormOrder" :key="fi">
+                  <v-chip
+                    size="small"
+                    variant="tonal"
+                    color="primary"
+                    closable
+                    @click:close="removeFromFormOrder(fi)"
+                  >{{ name }}</v-chip>
+                  <span v-if="fi < songFormOrder.length - 1" class="text-caption text-medium-emphasis">→</span>
+                </template>
+              </div>
+              <div class="d-flex justify-end">
+                <v-btn size="x-small" variant="text" color="secondary" @click="clearFormOrder">
+                  Clear form
+                </v-btn>
+              </div>
+            </template>
+          </template>
         </template>
 
         <v-alert
@@ -1271,8 +1320,8 @@ const songForm = ref(blankForm())
 
 // Song form mode + sections
 const songFormMode     = ref('simple') // 'simple' | 'full'
-const songFormSections = ref([])       // [{ id, name, chord_chart_str, notes, repeats }]
-const songFormOrder    = ref([])       // kept for compat; no longer driven from UI
+const songFormSections = ref([])       // [{ id, name, chord_chart_str, notes }]
+const songFormOrder    = ref([])       // performance sequence: array of section names
 const sectionDragSrcIdx  = ref(null)
 const sectionDragOverIdx = ref(null)
 const chordPickerSectionId = ref(null)
@@ -1286,14 +1335,8 @@ const diatonicPickerChords = computed(() => {
   return musicalKeys[root] ?? []
 })
 
-const formPreview = computed(() =>
-  songFormSections.value
-    .filter(s => s.name?.trim())
-    .map(s => {
-      const r = s.repeats ?? 1
-      return r > 1 ? `${s.name} ×${r}` : s.name
-    })
-    .join(' → ')
+const namedSections = computed(() =>
+  songFormSections.value.filter(s => s.name?.trim())
 )
 
 function chordQualityColor(chord) {
@@ -1322,13 +1365,30 @@ function removeChordFromSection(sectionId, idx) {
 }
 
 function newSectionRow() {
-  return { id: crypto.randomUUID(), name: '', chord_chart_str: '', notes: '', repeats: 1 }
+  return { id: crypto.randomUUID(), name: '', chord_chart_str: '', notes: '' }
 }
 function addSection() {
   songFormSections.value.push(newSectionRow())
 }
 function removeSection(idx) {
+  const removedName = songFormSections.value[idx]?.name?.trim()
   songFormSections.value.splice(idx, 1)
+  if (removedName) {
+    const remaining = new Set(songFormSections.value.map(s => s.name?.trim()).filter(Boolean))
+    if (!remaining.has(removedName)) {
+      songFormOrder.value = songFormOrder.value.filter(n => n !== removedName)
+    }
+  }
+}
+
+function addToFormOrder(name) {
+  songFormOrder.value = [...songFormOrder.value, name]
+}
+function removeFromFormOrder(idx) {
+  songFormOrder.value = songFormOrder.value.filter((_, i) => i !== idx)
+}
+function clearFormOrder() {
+  songFormOrder.value = []
 }
 function onSectionDragStart(idx) { sectionDragSrcIdx.value = idx }
 function onSectionDrop(targetIdx) {
@@ -1396,18 +1456,15 @@ function openEditSong(song) {
   }
   const hasSec = Array.isArray(song.sections) && song.sections.length > 0
   songFormMode.value = hasSec ? 'full' : 'simple'
-  const repeatCount = {}
-  ;(song.form_order ?? []).forEach(name => { repeatCount[name] = (repeatCount[name] ?? 0) + 1 })
   songFormSections.value = hasSec
     ? song.sections.map(s => ({
         id: s.id,
         name: s.name,
         chord_chart_str: Array.isArray(s.chord_chart) ? s.chord_chart.join(', ') : '',
         notes: s.notes ?? '',
-        repeats: repeatCount[s.name] ?? 1,
       }))
     : []
-  songFormOrder.value = []
+  songFormOrder.value = Array.isArray(song.form_order) ? [...song.form_order] : []
   chordPickerSectionId.value = null
   songFormError.value = ''
   spotifySearchQuery.value   = ''
@@ -1464,9 +1521,7 @@ async function saveSong() {
         }
       }
 
-      formOrderPayload = songFormSections.value
-        .filter(s => s.name.trim())
-        .flatMap(s => Array(s.repeats ?? 1).fill(s.name))
+      formOrderPayload = songFormOrder.value.filter(Boolean)
       // Flatten unique chords for backward compat
       const allChords = [...new Set(sectionsPayload.flatMap(s => s.chord_chart))]
       topChords = allChords.length ? allChords : null
