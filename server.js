@@ -348,6 +348,146 @@ app.get('/api/musicbrainz', async (req, res) => {
   }
 });
 
+// ── /api/suggest-songs ───────────────────────────────────────────────────────
+const SUGGEST_SONGS_SYSTEM =
+  'You are an experienced gigging musician and setlist curator with deep knowledge of cover songs ' +
+  'across all genres. You understand how songs flow together in a live set — key relationships, ' +
+  'tempo pacing, crowd energy arcs, and what works for different venue types. ' +
+  'Always respond with valid JSON only. No markdown, no explanation outside the JSON.';
+
+app.post('/api/suggest-songs', async (req, res) => {
+  const ip = req.ip;
+  if (!checkRateLimit(ip, 'suggest-songs', 5)) {
+    return res.status(429).json({ error: "You've made a lot of requests. Try again in an hour." });
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set on server' });
+
+  const { existingSongs, venueType, crowdVibe, genres, setLength, additionalContext } = req.body;
+
+  if (!venueType || typeof venueType !== 'string' || venueType.length > 100)
+    return res.status(400).json({ error: 'Invalid venueType' });
+  if (!crowdVibe || typeof crowdVibe !== 'string' || crowdVibe.length > 100)
+    return res.status(400).json({ error: 'Invalid crowdVibe' });
+  if (!Array.isArray(genres) || genres.length === 0 || genres.length > 10)
+    return res.status(400).json({ error: 'Invalid genres' });
+  if (!Number.isInteger(setLength) || setLength < 15 || setLength > 120)
+    return res.status(400).json({ error: 'Invalid setLength' });
+
+  const safeVenue   = String(venueType).replace(/[<>]/g, '').slice(0, 60);
+  const safeVibe    = String(crowdVibe).replace(/[<>]/g, '').slice(0, 60);
+  const safeGenres  = genres.map(g => String(g).replace(/[<>]/g, '').slice(0, 30)).join(', ');
+  const safeContext = additionalContext ? String(additionalContext).replace(/[<>]/g, '').slice(0, 300) : '';
+  const existingList = Array.isArray(existingSongs)
+    ? existingSongs.slice(0, 50).map(s => {
+        const t = String(s.title  || '').slice(0, 100);
+        const a = String(s.artist || 'Unknown').slice(0, 100);
+        const k = s.key  ? ` (${String(s.key).slice(0, 10)}` : '';
+        const b = s.bpm  ? `, ${parseInt(s.bpm)}bpm)` : (k ? ')' : '');
+        return `- ${t} by ${a}${k}${b}`;
+      }).join('\n')
+    : '(none yet)';
+
+  const userContent =
+    `I'm building a setlist for a ${safeVenue} with a ${safeVibe} crowd vibe.\n` +
+    `Genre focus: ${safeGenres}.\n` +
+    `Set length: approximately ${setLength} minutes.\n` +
+    (safeContext ? `Additional context: ${safeContext}\n` : '') +
+    `\nSongs already in my setlist:\n${existingList}\n\n` +
+    `Suggest 8-10 cover songs that would work well for this context. ` +
+    `Consider key relationships, tempo pacing, and crowd energy arc. ` +
+    `Avoid songs already in the setlist.\n\n` +
+    `Return this exact JSON:\n` +
+    `{"suggestions":[{"title":"string","artist":"string","key":"string","bpm":0,"genre":"string","reason":"string"}]}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 2000, system: SUGGEST_SONGS_SYSTEM,
+        messages: [{ role: 'user', content: userContent }] }),
+    });
+
+    if (!response.ok) return res.status(502).json({ error: 'AI service error' });
+    const data    = await response.json();
+    const rawText = data.content?.[0]?.text ?? '';
+    let parsed;
+    try {
+      parsed = JSON.parse(rawText.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim());
+    } catch {
+      console.error('suggest-songs parse error:', rawText.slice(0, 200));
+      return res.status(500).json({ error: 'Failed to parse AI response. Try again.' });
+    }
+    if (!Array.isArray(parsed.suggestions))
+      return res.status(500).json({ error: 'Unexpected AI response format.' });
+    res.json({ suggestions: parsed.suggestions });
+  } catch (err) {
+    console.error('suggest-songs error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── /api/sound-like ──────────────────────────────────────────────────────────
+const SOUND_LIKE_SYSTEM =
+  'You are a music theory expert and songwriter who can translate emotional and stylistic ' +
+  'descriptions into chord progressions. You understand how chord choices create specific ' +
+  'moods and sounds across genres. ' +
+  'Always respond with valid JSON only. No markdown, no explanation outside the JSON.';
+
+app.post('/api/sound-like', async (req, res) => {
+  const ip = req.ip;
+  if (!checkRateLimit(ip, 'sound-like', 10)) {
+    return res.status(429).json({ error: "You've made a lot of requests. Try again in an hour." });
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set on server' });
+
+  const { prompt, currentKey } = req.body;
+  if (!prompt || typeof prompt !== 'string' || prompt.length === 0 || prompt.length > 200)
+    return res.status(400).json({ error: 'Prompt required (max 200 chars)' });
+
+  const safePrompt = String(prompt).replace(/[<>]/g, '').slice(0, 200);
+  const safeKey    = currentKey && VALID_NOTES.has(String(currentKey)) ? String(currentKey) : null;
+
+  const userContent =
+    `A musician wants a chord progression that sounds like: '${safePrompt}'\n` +
+    (safeKey ? `They are working in the key of ${safeKey}.\n` : '') +
+    `\nSuggest 1-2 chord progressions that capture this feel. ` +
+    `For each, explain in 2-3 plain English sentences why these chords create that sound. ` +
+    `Be conversational and specific — mention the emotional quality, any famous songs that use it, ` +
+    `and what makes it work.\n\n` +
+    `Return this exact JSON:\n` +
+    `{"progressions":[{"title":"string","key":"string","keyType":"major","chords":["string"],"nns":["string"],"explanation":"string"}]}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 1500, system: SOUND_LIKE_SYSTEM,
+        messages: [{ role: 'user', content: userContent }] }),
+    });
+
+    if (!response.ok) return res.status(502).json({ error: 'AI service error' });
+    const data    = await response.json();
+    const rawText = data.content?.[0]?.text ?? '';
+    let parsed;
+    try {
+      parsed = JSON.parse(rawText.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim());
+    } catch {
+      console.error('sound-like parse error:', rawText.slice(0, 200));
+      return res.status(500).json({ error: 'Failed to parse AI response. Try again.' });
+    }
+    if (!Array.isArray(parsed.progressions))
+      return res.status(500).json({ error: 'Unexpected AI response format.' });
+    res.json({ progressions: parsed.progressions });
+  } catch (err) {
+    console.error('sound-like error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Static files & SPA catch-all ─────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, 'dist')));
 

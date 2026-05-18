@@ -506,6 +506,108 @@
       </div>
     </v-expand-transition>
 
+    <!-- ── Sound Like... progression generator ───────────────────────────── -->
+    <div class="d-flex align-center mt-6 mb-2 cursor-pointer" style="user-select:none" @click="soundLikeOpen = !soundLikeOpen">
+      <span class="section-title" style="margin-bottom:0;flex:1">Sound Like...</span>
+      <v-icon size="18" color="primary" style="transition:transform 0.2s" :style="soundLikeOpen ? 'transform:rotate(180deg)' : ''">
+        mdi-chevron-down
+      </v-icon>
+    </div>
+
+    <v-expand-transition>
+      <div v-if="soundLikeOpen">
+        <p class="text-body-2 text-medium-emphasis mb-3" style="line-height:1.6">
+          Describe a vibe, artist, or era and get AI-generated chord progressions to try.
+        </p>
+
+        <!-- Inspiration chips -->
+        <div class="d-flex flex-wrap mb-3" style="gap:6px">
+          <v-chip
+            v-for="chip in SOUND_LIKE_CHIPS" :key="chip"
+            size="small" variant="outlined"
+            style="cursor:pointer"
+            @click="soundLikePrompt = chip"
+          >{{ chip }}</v-chip>
+        </div>
+
+        <!-- Prompt input + generate button -->
+        <div class="d-flex mb-3" style="gap:8px">
+          <v-text-field
+            v-model="soundLikePrompt"
+            placeholder="e.g. late-night jazz bar, 90s grunge, gospel feel..."
+            variant="outlined" density="compact" hide-details
+            maxlength="200"
+            style="flex:1"
+            @keydown.enter="generateSoundLike"
+          />
+          <v-btn
+            color="primary" variant="flat" size="default"
+            :loading="soundLikeLoading"
+            :disabled="!soundLikePrompt.trim()"
+            prepend-icon="mdi-robot-outline"
+            @click="generateSoundLike"
+          >Generate</v-btn>
+        </div>
+
+        <!-- Loading waveform -->
+        <div v-if="soundLikeLoading" class="d-flex align-center mb-4" style="gap:12px">
+          <div class="waveform" style="height:28px">
+            <span v-for="i in 5" :key="i" class="waveform-bar" />
+          </div>
+          <span class="text-caption text-medium-emphasis">Composing progressions...</span>
+        </div>
+
+        <!-- Error -->
+        <v-alert
+          v-if="soundLikeError"
+          type="error" variant="tonal" density="compact" closable class="mb-3"
+          @click:close="soundLikeError = ''"
+        >{{ soundLikeError }}</v-alert>
+
+        <!-- Results -->
+        <div v-for="(prog, pi) in soundLikeResults" :key="pi" class="sound-like-card mb-3 pa-4">
+          <div class="text-body-2 font-weight-bold mb-1" style="color:#E8E8E0">{{ prog.title }}</div>
+          <div class="text-caption text-medium-emphasis mb-2">Key of {{ prog.key }} {{ prog.keyType }}</div>
+
+          <!-- Chord chips -->
+          <div class="d-flex flex-wrap mb-2" style="gap:6px">
+            <v-chip
+              v-for="(ch, ci) in prog.chords" :key="ci"
+              size="small"
+              :class="chordQualityClass(ch)"
+              style="cursor:pointer; font-weight:600"
+              @click="loadSoundLikeChordIntoExplore(ch, prog)"
+            >{{ ch }}</v-chip>
+          </div>
+
+          <!-- NNS -->
+          <div class="d-flex flex-wrap mb-3" style="gap:4px">
+            <span v-for="(n, ni) in prog.nns" :key="ni" class="chip-nns-style">{{ n }}</span>
+          </div>
+
+          <div class="text-caption text-medium-emphasis mb-3" style="line-height:1.65;font-style:italic">{{ prog.explanation }}</div>
+
+          <!-- Actions -->
+          <div class="d-flex" style="gap:8px">
+            <v-btn
+              size="x-small" variant="outlined" color="primary"
+              prepend-icon="mdi-music-note-outline"
+              @click="loadSoundLikeIntoExplore(prog)"
+            >Load into Explore</v-btn>
+            <v-btn
+              size="x-small" variant="outlined" color="secondary"
+              prepend-icon="mdi-play-circle-outline"
+              @click="loadSoundLikeIntoPlay(prog)"
+            >Load into Play</v-btn>
+          </div>
+        </div>
+
+        <div v-if="soundLikeResults.length" class="text-caption mb-2" style="opacity:0.4;font-size:0.6rem">
+          AI-generated progressions — experiment freely, not all will fit your song.
+        </div>
+      </div>
+    </v-expand-transition>
+
     <!-- ── Reference: extended chords ────────────────────────────────────── -->
     <v-expansion-panels variant="accordion" class="mt-2">
       <v-expansion-panel>
@@ -955,9 +1057,92 @@ function explainDifferently() {
   explain('Explain it a completely different way — use an analogy or describe how it physically feels to hear it. Keep it shorter and more casual.')
 }
 
+// ─── Sound Like ───────────────────────────────────────────────────────────────
+
+const SOUND_LIKE_CHIPS = [
+  'Late-night jazz bar',
+  '90s grunge',
+  'Gospel feel',
+  'Sun-soaked reggae',
+  'Country tearjerker',
+  'Motown groove',
+  '80s arena rock',
+  'Bossa nova afternoon',
+]
+
+const soundLikeOpen    = ref(false)
+const soundLikePrompt  = ref('')
+const soundLikeLoading = ref(false)
+const soundLikeError   = ref('')
+const soundLikeResults = ref([])
+
+function chordQualityClass(chord) {
+  if (!chord) return ''
+  const c = chord.trim()
+  if (c.includes('dim')) return 'chip-dim'
+  if (c.endsWith('m') || c.includes('m7') || c.includes('m9')) return 'chip-minor'
+  return 'chip-major'
+}
+
+function normalizeChordToSharp(chord) {
+  const FLAT_MAP = { 'Bb': 'A#', 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#' }
+  const root = chord.replace(/[^A-Ga-g#b]/g, '')
+  return FLAT_MAP[root] ? chord.replace(root, FLAT_MAP[root]) : chord
+}
+
+async function generateSoundLike() {
+  if (!soundLikePrompt.value.trim()) return
+  soundLikeError.value   = ''
+  soundLikeResults.value = []
+  soundLikeLoading.value = true
+  try {
+    const res  = await fetch('/api/sound-like', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ prompt: soundLikePrompt.value.trim(), currentKey: detectedKey.value || null }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Request failed')
+    soundLikeResults.value = Array.isArray(data.progressions) ? data.progressions : []
+  } catch (err) {
+    soundLikeError.value = err.message || 'Something went wrong. Try again.'
+  } finally {
+    soundLikeLoading.value = false
+  }
+}
+
+function loadSoundLikeChordIntoExplore(chord) {
+  const sharp = normalizeChordToSharp(chord)
+  if (!selectedChordsSharp.value.includes(sharp) && selectedChordsSharp.value.length < 7) {
+    selectedChordsSharp.value.push(sharp)
+  }
+}
+
+function loadSoundLikeIntoExplore(prog) {
+  const normalized = (prog.chords || []).map(normalizeChordToSharp)
+  selectedChordsSharp.value = normalized.slice(0, 7)
+  explanationText.value  = ''
+  explanationError.value = ''
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function loadSoundLikeIntoPlay(prog) {
+  router.push({
+    path: '/play',
+    state: {
+      _cadenceLoad: true,
+      chords:  (prog.chords || []).map(normalizeChordToSharp),
+      key:     prog.key     || null,
+      keyType: prog.keyType || 'major',
+      bpm:     80,
+    },
+  })
+}
+
 onBeforeRouteLeave(() => {
-  settingsOpen.value  = false
-  saveDialogOpen.value = false
+  settingsOpen.value     = false
+  saveDialogOpen.value   = false
+  soundLikeLoading.value = false
 })
 </script>
 
@@ -1269,5 +1454,12 @@ onBeforeRouteLeave(() => {
 .prog-item:last-child {
   border-bottom: none;
   padding-bottom: 2px;
+}
+
+/* ── Sound Like ──────────────────────────────────────────────────────────── */
+.sound-like-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
 }
 </style>

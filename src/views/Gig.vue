@@ -140,6 +140,12 @@
               </div>
             </div>
             <v-spacer />
+            <v-btn
+              variant="text" size="small" color="secondary"
+              prepend-icon="mdi-robot-outline"
+              class="mr-2"
+              @click="openSuggestDialog"
+            >Suggest</v-btn>
             <v-btn color="primary" variant="flat" size="small" prepend-icon="mdi-plus" @click="openAddSong">
               Add Song
             </v-btn>
@@ -1043,6 +1049,123 @@
           Delete
         </v-btn>
       </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- ── Suggest Songs dialog ──────────────────────────────────────────────── -->
+  <v-dialog v-model="suggestDialogOpen" max-width="580" scrollable :persistent="suggestLoading">
+    <v-card>
+      <v-card-title class="pt-5 pb-2 px-5" style="font-family:'Space Grotesk',sans-serif">
+        <div class="d-flex align-center">
+          <v-icon size="20" color="primary" class="mr-2">mdi-robot-outline</v-icon>
+          Suggest Songs
+        </div>
+      </v-card-title>
+
+      <!-- Step 1: Context form -->
+      <template v-if="suggestStep === 1">
+        <v-card-text class="px-5 pt-1 pb-3">
+          <div class="suggest-label mb-2">Venue type *</div>
+          <div class="d-flex flex-wrap mb-4" style="gap:6px">
+            <v-chip
+              v-for="v in VENUE_TYPES" :key="v" size="small"
+              :color="suggestForm.venueType === v ? 'primary' : undefined"
+              :variant="suggestForm.venueType === v ? 'flat' : 'outlined'"
+              style="cursor:pointer" @click="suggestForm.venueType = v"
+            >{{ v }}</v-chip>
+          </div>
+
+          <div class="suggest-label mb-2">Crowd vibe *</div>
+          <div class="d-flex flex-wrap mb-4" style="gap:6px">
+            <v-chip
+              v-for="v in CROWD_VIBES" :key="v" size="small"
+              :color="suggestForm.crowdVibe === v ? 'primary' : undefined"
+              :variant="suggestForm.crowdVibe === v ? 'flat' : 'outlined'"
+              style="cursor:pointer" @click="suggestForm.crowdVibe = v"
+            >{{ v }}</v-chip>
+          </div>
+
+          <div class="suggest-label mb-2">Genre focus (multi-select)</div>
+          <div class="d-flex flex-wrap mb-4" style="gap:6px">
+            <v-chip
+              v-for="g in GENRE_OPTIONS" :key="g" size="small"
+              :color="suggestForm.genres.includes(g) ? 'secondary' : undefined"
+              :variant="suggestForm.genres.includes(g) ? 'flat' : 'outlined'"
+              style="cursor:pointer" @click="toggleSuggestGenre(g)"
+            >{{ g }}</v-chip>
+          </div>
+
+          <div class="suggest-label mb-1">Set length: {{ suggestForm.setLength }} min</div>
+          <v-slider v-model="suggestForm.setLength" min="15" max="120" step="5" color="primary" hide-details class="mb-4" />
+
+          <v-textarea
+            v-model="suggestForm.additionalContext"
+            label="Additional context (optional)"
+            placeholder="e.g. outdoor afternoon show, mostly 40-50 year olds, no drums"
+            variant="outlined" density="compact" rows="2" auto-grow hide-details
+          />
+
+          <v-alert v-if="suggestError" type="error" variant="tonal" density="compact" closable class="mt-3"
+            @click:close="suggestError = ''">{{ suggestError }}</v-alert>
+        </v-card-text>
+        <v-card-actions class="px-5 pb-4 pt-0">
+          <v-spacer />
+          <v-btn variant="text" size="small" color="secondary" @click="suggestDialogOpen = false">Cancel</v-btn>
+          <v-btn
+            color="primary" variant="flat" size="small"
+            :disabled="!suggestForm.venueType || !suggestForm.crowdVibe"
+            @click="getSuggestions"
+          >Get Suggestions</v-btn>
+        </v-card-actions>
+      </template>
+
+      <!-- Step 2: Loading -->
+      <template v-else-if="suggestStep === 2">
+        <v-card-text class="px-5 py-10 text-center">
+          <div class="waveform mb-4" style="justify-content:center">
+            <span v-for="i in 5" :key="i" class="waveform-bar" />
+          </div>
+          <div class="text-body-2 text-medium-emphasis">{{ suggestLoadingMsg }}</div>
+        </v-card-text>
+      </template>
+
+      <!-- Step 3: Results -->
+      <template v-else-if="suggestStep === 3">
+        <v-card-text class="px-4 pt-3 pb-1" style="max-height:62vh; overflow-y:auto">
+          <div v-for="(s, si) in suggestResults" :key="si" class="suggest-card mb-3 pa-3">
+            <div class="d-flex align-start justify-space-between" style="gap:8px">
+              <div class="flex-grow-1" style="min-width:0">
+                <div class="text-body-2 font-weight-bold" style="color:#E8E8E0">{{ s.title }}</div>
+                <div class="text-caption text-medium-emphasis">{{ s.artist }}</div>
+                <div class="d-flex flex-wrap mt-1 mb-2" style="gap:4px">
+                  <v-chip v-if="s.key"   size="x-small" color="primary"   variant="tonal">{{ s.key }}</v-chip>
+                  <v-chip v-if="s.bpm"   size="x-small" color="secondary" variant="tonal">~{{ s.bpm }} BPM</v-chip>
+                  <v-chip v-if="s.genre" size="x-small" variant="outlined">{{ s.genre }}</v-chip>
+                </div>
+              </div>
+              <v-btn size="x-small" variant="flat" color="primary" class="flex-shrink-0 mt-1" @click="addSuggestion(s)">
+                + Add
+              </v-btn>
+            </div>
+            <v-divider class="mb-2" />
+            <div class="text-caption text-medium-emphasis" style="line-height:1.65;font-style:italic">{{ s.reason }}</div>
+          </div>
+
+          <div class="text-caption text-medium-emphasis mt-1 mb-2" style="opacity:0.55;font-size:0.6rem">
+            AI suggestions — verify chords before your gig. Keys and BPM are approximate.
+          </div>
+
+          <v-alert v-if="suggestError" type="error" variant="tonal" density="compact" closable class="mb-2"
+            @click:close="suggestError = ''">{{ suggestError }}</v-alert>
+        </v-card-text>
+        <v-card-actions class="px-5 pb-4 pt-2">
+          <v-btn variant="text" size="small" color="secondary" prepend-icon="mdi-refresh" @click="getSuggestions">
+            Regenerate
+          </v-btn>
+          <v-spacer />
+          <v-btn variant="text" size="small" @click="suggestDialogOpen = false">Close</v-btn>
+        </v-card-actions>
+      </template>
     </v-card>
   </v-dialog>
 </template>
@@ -2120,6 +2243,104 @@ async function revealDrillCard() {
   chords.forEach((chord, i) => setTimeout(() => audioPlayChord(chord), i * 400))
 }
 
+// ── Suggest Songs ─────────────────────────────────────────────────────────────
+const VENUE_TYPES    = ['Bar/Pub', 'Restaurant', 'Wedding', 'Corporate', 'Festival', 'House Party', 'Other']
+const CROWD_VIBES    = ['Chill/Background', 'Party/Dance', 'Emotional/Heartfelt', 'Mixed/General']
+const GENRE_OPTIONS  = ['Country', 'Rock', 'Pop', 'R&B/Soul', 'Folk/Acoustic', 'Jazz', 'Blues', 'Mixed']
+const SUGGEST_MESSAGES = [
+  'Analyzing your setlist...',
+  'Thinking about your crowd...',
+  'Finding songs that fit...',
+  'Almost ready...',
+]
+
+const suggestDialogOpen = ref(false)
+const suggestStep       = ref(1)
+const suggestLoading    = ref(false)
+const suggestError      = ref('')
+const suggestResults    = ref([])
+const suggestLoadingMsg = ref('')
+const suggestForm       = ref({ venueType: '', crowdVibe: '', genres: [], setLength: 45, additionalContext: '' })
+let suggestMsgTimer = null
+
+function openSuggestDialog() {
+  suggestStep.value    = 1
+  suggestError.value   = ''
+  suggestResults.value = []
+  suggestDialogOpen.value = true
+}
+
+function toggleSuggestGenre(g) {
+  const idx = suggestForm.value.genres.indexOf(g)
+  if (idx === -1) suggestForm.value.genres.push(g)
+  else suggestForm.value.genres.splice(idx, 1)
+}
+
+function startLoadingMessages() {
+  let i = 0
+  suggestLoadingMsg.value = SUGGEST_MESSAGES[0]
+  suggestMsgTimer = setInterval(() => {
+    i = (i + 1) % SUGGEST_MESSAGES.length
+    suggestLoadingMsg.value = SUGGEST_MESSAGES[i]
+  }, 1800)
+}
+
+function stopLoadingMessages() {
+  clearInterval(suggestMsgTimer)
+  suggestMsgTimer = null
+}
+
+async function getSuggestions() {
+  suggestError.value   = ''
+  suggestResults.value = []
+  suggestStep.value    = 2
+  suggestLoading.value = true
+  startLoadingMessages()
+  try {
+    const body = {
+      venueType:         suggestForm.value.venueType,
+      crowdVibe:         suggestForm.value.crowdVibe,
+      genres:            suggestForm.value.genres,
+      setLength:         suggestForm.value.setLength,
+      additionalContext: suggestForm.value.additionalContext,
+    }
+    const res  = await fetch('/api/suggest-songs', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Request failed')
+    suggestResults.value = Array.isArray(data.suggestions) ? data.suggestions : []
+    suggestStep.value    = 3
+  } catch (err) {
+    suggestError.value = err.message || 'Something went wrong. Try again.'
+    suggestStep.value  = 1
+  } finally {
+    stopLoadingMessages()
+    suggestLoading.value = false
+  }
+}
+
+function addSuggestion(s) {
+  editingSong.value      = null
+  songFormMode.value     = 'simple'
+  songFormSections.value = []
+  songFormOrder.value    = []
+  const keyRoot = s.key && musicalKeys[s.key] ? s.key : null
+  songForm.value = {
+    title:     s.title  || '',
+    artist:    s.artist || '',
+    key_root:  keyRoot,
+    key_type:  'major',
+    bpm:       s.bpm ? Number(s.bpm) : null,
+    chord_chart: '',
+    notes:     s.reason ? `AI suggestion: ${s.reason}` : '',
+  }
+  suggestDialogOpen.value = false
+  songDialog.value        = true
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 onMounted(()   => { if (currentUser.value) loadSetlists() })
 onActivated(() => { if (currentUser.value) loadSetlists() })
@@ -2131,8 +2352,9 @@ onBeforeRouteLeave(() => {
   spotifySearchQuery.value   = ''
   spotifyResults.value       = []
   deleteDialog.value         = false
-  newSetlistOpen.value    = false
-  authOpen.value          = false
+  newSetlistOpen.value       = false
+  authOpen.value             = false
+  suggestDialogOpen.value    = false
 })
 
 watch(currentUser, user => {
@@ -2394,5 +2616,42 @@ watch(currentUser, user => {
     border-color: rgba(200, 169, 110, 1);
     box-shadow: 0 0 0 4px rgba(200, 169, 110, 0.12);
   }
+}
+
+/* ── Suggest Songs ──────────────────────────────────────────────────────── */
+.suggest-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(196, 196, 188, 0.5);
+  font-weight: 600;
+}
+.suggest-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* ── Waveform loading animation ─────────────────────────────────────────── */
+.waveform {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 36px;
+}
+.waveform-bar {
+  width: 4px;
+  border-radius: 2px;
+  background: #C8A96E;
+  animation: wave 1s ease-in-out infinite;
+}
+.waveform-bar:nth-child(1) { animation-delay: 0s;    height: 12px; }
+.waveform-bar:nth-child(2) { animation-delay: 0.15s; height: 20px; }
+.waveform-bar:nth-child(3) { animation-delay: 0.30s; height: 32px; }
+.waveform-bar:nth-child(4) { animation-delay: 0.45s; height: 20px; }
+.waveform-bar:nth-child(5) { animation-delay: 0.60s; height: 12px; }
+@keyframes wave {
+  0%, 100% { transform: scaleY(0.5); opacity: 0.5; }
+  50%       { transform: scaleY(1.0); opacity: 1.0; }
 }
 </style>
