@@ -603,8 +603,8 @@
         <!-- Action buttons -->
         <v-btn
           v-if="drillCardPhase === 'question'"
-          color="primary" variant="flat" size="large"
-          block style="min-height: 52px; font-size: 1rem; font-weight: 600; max-width: 400px"
+          color="primary" variant="outlined"
+          class="reveal-btn"
           @click="revealDrillCard"
         >Reveal</v-btn>
 
@@ -616,25 +616,25 @@
             block style="min-height: 52px; max-width: 400px"
             @click="advanceSectionDrill"
           >Next <span class="text-caption ml-1">({{ drillSectionIdx + 1 }}/{{ drillSectionsOrdered.length }})</span></v-btn>
-          <div v-else class="d-flex flex-column align-center w-100" style="gap: 10px; max-width: 400px">
-            <v-btn color="success" variant="flat" block :loading="drillSavingRating" style="min-height:56px;font-size:1rem;font-weight:600" @click="rateCurrentSong('got_it')">
+          <div v-else class="d-flex flex-column align-center w-100" style="gap: 8px; max-width: 360px">
+            <v-btn color="success" variant="flat" block :loading="drillSavingRating" style="min-height:52px;font-size:0.95rem;font-weight:600" @click="rateCurrentSong('got_it')">
               <v-icon start>mdi-check-circle-outline</v-icon>Got it
             </v-btn>
-            <v-btn color="warning" variant="flat" block :loading="drillSavingRating" style="min-height:56px;font-size:1rem;font-weight:600" @click="rateCurrentSong('almost')">
+            <v-btn color="warning" variant="flat" block :loading="drillSavingRating" style="min-height:52px;font-size:0.95rem;font-weight:600" @click="rateCurrentSong('almost')">
               <v-icon start>mdi-minus-circle-outline</v-icon>Almost
             </v-btn>
-            <v-btn color="error" variant="flat" block :loading="drillSavingRating" style="min-height:56px;font-size:1rem;font-weight:600" @click="rateCurrentSong('missed')">
+            <v-btn color="error" variant="flat" block :loading="drillSavingRating" style="min-height:52px;font-size:0.95rem;font-weight:600" @click="rateCurrentSong('missed')">
               <v-icon start>mdi-close-circle-outline</v-icon>Missed
             </v-btn>
           </div>
         </template>
 
         <!-- Regular drills: rate after reveal -->
-        <div v-else class="d-flex flex-column align-center w-100" style="gap: 10px; max-width: 400px">
+        <div v-else class="d-flex flex-column align-center w-100" style="gap: 8px; max-width: 360px">
           <v-btn
             color="success" variant="flat" block
             :loading="drillSavingRating"
-            style="min-height:56px;font-size:1rem;font-weight:600"
+            style="min-height:52px;font-size:0.95rem;font-weight:600"
             @click="rateCurrentSong('got_it')"
           >
             <v-icon start>mdi-check-circle-outline</v-icon>Got it
@@ -642,7 +642,7 @@
           <v-btn
             color="warning" variant="flat" block
             :loading="drillSavingRating"
-            style="min-height:56px;font-size:1rem;font-weight:600"
+            style="min-height:52px;font-size:0.95rem;font-weight:600"
             @click="rateCurrentSong('almost')"
           >
             <v-icon start>mdi-minus-circle-outline</v-icon>Almost
@@ -650,7 +650,7 @@
           <v-btn
             color="error" variant="flat" block
             :loading="drillSavingRating"
-            style="min-height:56px;font-size:1rem;font-weight:600"
+            style="min-height:52px;font-size:0.95rem;font-weight:600"
             @click="rateCurrentSong('missed')"
           >
             <v-icon start>mdi-close-circle-outline</v-icon>Missed
@@ -752,15 +752,29 @@
           <span class="text-caption text-medium-emphasis px-2">Song details</span>
         </v-divider>
 
-        <!-- Mode toggle -->
-        <v-btn-toggle
-          v-model="songFormMode"
-          mandatory density="compact" variant="outlined" color="primary"
-          class="mb-4" style="width:100%"
-        >
-          <v-btn value="simple" style="flex:1">Simple</v-btn>
-          <v-btn value="full"   style="flex:1">Full Song Form</v-btn>
-        </v-btn-toggle>
+        <!-- Mode selector cards -->
+        <div class="d-flex mb-4" style="gap: 10px">
+          <div
+            class="mode-card"
+            :class="{ 'mode-card--active': songFormMode === 'simple' }"
+            style="flex: 1"
+            @click="songFormMode = 'simple'"
+          >
+            <v-icon size="18" class="mb-1" :color="songFormMode === 'simple' ? 'primary' : 'medium-emphasis'">mdi-format-list-bulleted</v-icon>
+            <div class="mode-card-title">Simple</div>
+            <div class="mode-card-desc">One chord chart for the whole song</div>
+          </div>
+          <div
+            class="mode-card"
+            :class="{ 'mode-card--active': songFormMode === 'full' }"
+            style="flex: 1"
+            @click="songFormMode = 'full'"
+          >
+            <v-icon size="18" class="mb-1" :color="songFormMode === 'full' ? 'primary' : 'medium-emphasis'">mdi-view-list</v-icon>
+            <div class="mode-card-title">Full Form</div>
+            <div class="mode-card-desc">Sections with individual chord charts</div>
+          </div>
+        </div>
 
         <!-- Shared fields -->
         <v-text-field
@@ -827,88 +841,118 @@
 
         <!-- ── Full form mode ─────────────────────────────────────────────── -->
         <template v-else>
-          <!-- Section builder -->
-          <div class="d-flex align-center mb-2">
-            <span class="text-caption text-medium-emphasis" style="font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase">Sections</span>
-            <v-spacer />
-            <v-btn size="x-small" variant="text" color="primary" prepend-icon="mdi-plus" @click="addSection">Add Section</v-btn>
+          <!-- Live form preview -->
+          <div v-if="formPreview" class="d-flex align-center flex-wrap mb-3" style="gap: 4px">
+            <span class="text-caption text-medium-emphasis" style="font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;flex-shrink:0">Form:</span>
+            <span style="font-size: 0.75rem; color: rgba(200,169,110,0.9)">{{ formPreview }}</span>
           </div>
 
-          <div
-            v-for="(section, si) in songFormSections"
-            :key="section.id"
-            class="section-row-builder mb-2 pa-3"
-            draggable="true"
-            @dragstart="onSectionDragStart(si)"
-            @dragover.prevent="sectionDragOverIdx = si"
-            @drop.prevent="onSectionDrop(si)"
-            @dragend="sectionDragSrcIdx = null; sectionDragOverIdx = null"
-            :class="{ 'section-row--over': sectionDragOverIdx === si }"
-          >
-            <div class="d-flex align-center mb-2" style="gap: 8px">
-              <v-icon size="16" color="medium-emphasis" style="cursor:grab;flex-shrink:0">mdi-drag-vertical</v-icon>
-              <v-combobox
-                v-model="section.name"
-                :items="SECTION_PRESETS"
-                label="Section name"
-                variant="outlined" density="compact" hide-details
-                style="flex:1"
-              />
-              <v-btn icon size="x-small" variant="text" color="error" @click="removeSection(si)">
-                <v-icon size="14">mdi-close</v-icon>
-              </v-btn>
-            </div>
-            <v-text-field
-              v-model="section.chord_chart_str"
-              label="Chords (comma-separated)"
-              placeholder="C, Am, F, G"
-              variant="outlined" density="compact" hide-details
-              class="mb-1"
-            />
-            <div v-if="sectionNNS(section).length" class="d-flex align-center flex-wrap mb-2" style="gap: 3px; padding-left: 2px">
-              <span class="text-caption text-medium-emphasis mr-1" style="font-size:0.65rem">NNS:</span>
-              <v-chip v-for="(n, ni) in sectionNNS(section)" :key="ni" size="x-small" variant="tonal" :color="n ? 'primary' : 'error'">{{ n ?? '?' }}</v-chip>
-            </div>
-            <v-text-field
-              v-model="section.notes"
-              label="Notes (optional)"
-              variant="outlined" density="compact" hide-details
-            />
-          </div>
+          <!-- Section cards -->
+          <v-slide-y-transition group leave-absolute>
+            <div
+              v-for="(section, si) in songFormSections"
+              :key="section.id"
+              class="section-row-builder mb-2 pa-3"
+              draggable="true"
+              @dragstart="onSectionDragStart(si)"
+              @dragover.prevent="sectionDragOverIdx = si"
+              @drop.prevent="onSectionDrop(si)"
+              @dragend="sectionDragSrcIdx = null; sectionDragOverIdx = null"
+              :class="{ 'section-row--over': sectionDragOverIdx === si }"
+            >
+              <!-- Header: drag + name + repeat stepper + delete -->
+              <div class="d-flex align-center mb-2" style="gap: 8px">
+                <v-icon size="16" color="medium-emphasis" style="cursor:grab;flex-shrink:0">mdi-drag-vertical</v-icon>
+                <v-combobox
+                  v-model="section.name"
+                  :items="SECTION_PRESETS"
+                  label="Section name"
+                  variant="outlined" density="compact" hide-details
+                  style="flex:1"
+                />
+                <div class="d-flex align-center" style="gap: 2px; flex-shrink: 0">
+                  <v-btn icon size="x-small" variant="text" :disabled="(section.repeats ?? 1) <= 1" @click="section.repeats = Math.max(1, (section.repeats ?? 1) - 1)">
+                    <v-icon size="14">mdi-minus</v-icon>
+                  </v-btn>
+                  <span style="font-size: 0.78rem; color: rgba(196,196,188,0.7); min-width: 22px; text-align: center">×{{ section.repeats ?? 1 }}</span>
+                  <v-btn icon size="x-small" variant="text" :disabled="(section.repeats ?? 1) >= 8" @click="section.repeats = Math.min(8, (section.repeats ?? 1) + 1)">
+                    <v-icon size="14">mdi-plus</v-icon>
+                  </v-btn>
+                </div>
+                <v-btn icon size="x-small" variant="text" color="error" @click="removeSection(si)">
+                  <v-icon size="14">mdi-close</v-icon>
+                </v-btn>
+              </div>
 
+              <!-- Chord chips + picker -->
+              <div class="d-flex align-center flex-wrap mb-1" style="gap: 4px; min-height: 28px">
+                <v-chip
+                  v-for="(chord, ci) in sectionChordList(section)"
+                  :key="ci"
+                  size="small" closable
+                  :color="chordQualityColor(chord)"
+                  variant="tonal"
+                  @click:close="removeChordFromSection(section.id, ci)"
+                >{{ chord }}</v-chip>
+
+                <v-menu
+                  :model-value="chordPickerSectionId === section.id"
+                  @update:model-value="v => { chordPickerSectionId = v ? section.id : null }"
+                  :close-on-content-click="false"
+                  location="bottom start"
+                  max-width="300"
+                >
+                  <template #activator="{ props: menuProps }">
+                    <v-chip v-bind="menuProps" size="small" variant="outlined" color="primary" style="cursor:pointer">
+                      <v-icon start size="12">mdi-plus</v-icon>Add
+                    </v-chip>
+                  </template>
+                  <v-card class="pa-2" style="background:#1A1A1F">
+                    <template v-if="diatonicPickerChords.length">
+                      <div class="text-caption text-medium-emphasis px-1 mb-1" style="font-size:0.6rem;letter-spacing:0.07em;text-transform:uppercase">
+                        In Key of {{ songForm.key_root }}{{ songForm.key_type === 'minor' ? 'm' : '' }}
+                      </div>
+                      <div class="d-flex flex-wrap mb-2" style="gap: 4px">
+                        <v-btn
+                          v-for="chord in diatonicPickerChords"
+                          :key="chord"
+                          size="x-small" density="compact" variant="tonal"
+                          :color="chordQualityColor(chord)"
+                          @click="addChordToSection(section.id, chord)"
+                        >{{ chord }}</v-btn>
+                      </div>
+                      <v-divider class="mb-2" />
+                    </template>
+                    <div class="text-caption text-medium-emphasis px-1 mb-1" style="font-size:0.6rem;letter-spacing:0.07em;text-transform:uppercase">All Chords</div>
+                    <div style="max-height: 180px; overflow-y: auto">
+                      <div class="d-flex flex-wrap mb-1" style="gap: 3px">
+                        <v-btn v-for="r in ALL_ROOTS" :key="r" size="x-small" density="compact" variant="tonal" color="primary" @click="addChordToSection(section.id, r)">{{ r }}</v-btn>
+                      </div>
+                      <div class="d-flex flex-wrap mb-1" style="gap: 3px">
+                        <v-btn v-for="r in ALL_ROOTS" :key="r+'m'" size="x-small" density="compact" variant="tonal" color="secondary" @click="addChordToSection(section.id, r+'m')">{{ r }}m</v-btn>
+                      </div>
+                      <div class="d-flex flex-wrap" style="gap: 3px">
+                        <v-btn v-for="r in ALL_ROOTS" :key="r+'dim'" size="x-small" density="compact" variant="tonal" color="error" @click="addChordToSection(section.id, r+'dim')">{{ r }}dim</v-btn>
+                      </div>
+                    </div>
+                  </v-card>
+                </v-menu>
+              </div>
+
+              <!-- NNS preview -->
+              <div v-if="sectionNNS(section).length" class="d-flex align-center flex-wrap" style="gap: 3px; padding-left: 2px">
+                <span class="text-caption text-medium-emphasis mr-1" style="font-size:0.65rem">NNS:</span>
+                <v-chip v-for="(n, ni) in sectionNNS(section)" :key="ni" size="x-small" variant="tonal" :color="n ? 'primary' : 'error'">{{ n ?? '?' }}</v-chip>
+              </div>
+            </div>
+          </v-slide-y-transition>
+
+          <!-- Add Section dashed button -->
           <v-btn
-            v-if="!songFormSections.length"
             block variant="outlined" color="secondary" size="small"
-            prepend-icon="mdi-plus" class="mb-3"
+            prepend-icon="mdi-plus" class="add-section-btn mt-1"
             @click="addSection"
-          >Add your first section</v-btn>
-
-          <!-- Form order builder -->
-          <div v-if="songFormSections.some(s => s.name?.trim())" class="mt-3 pt-3" style="border-top:1px solid rgba(255,255,255,0.07)">
-            <div class="text-caption text-medium-emphasis mb-2" style="font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase">
-              Song Form (performance order)
-            </div>
-            <div class="d-flex flex-wrap mb-2" style="gap: 6px">
-              <v-chip
-                v-for="s in songFormSections.filter(s => s.name?.trim())"
-                :key="s.id"
-                size="small" variant="outlined" color="secondary"
-                style="cursor:pointer"
-                @click="songFormOrder.push(s.name)"
-              >+ {{ s.name }}</v-chip>
-            </div>
-            <div v-if="songFormOrder.length" class="d-flex flex-wrap mb-2" style="gap: 4px">
-              <v-chip
-                v-for="(name, oi) in songFormOrder" :key="oi"
-                size="small" variant="tonal" color="primary"
-                closable
-                @click:close="songFormOrder.splice(oi, 1)"
-              >{{ oi + 1 }}. {{ name }}</v-chip>
-            </div>
-            <div v-if="songFormOrder.length" class="text-right">
-              <v-btn size="x-small" variant="text" color="error" @click="songFormOrder = []">Clear form</v-btn>
-            </div>
-          </div>
+          >{{ songFormSections.length ? 'Add Section' : 'Add your first section' }}</v-btn>
         </template>
 
         <v-alert
@@ -1227,24 +1271,64 @@ const songForm = ref(blankForm())
 
 // Song form mode + sections
 const songFormMode     = ref('simple') // 'simple' | 'full'
-const songFormSections = ref([])       // [{ id, name, chord_chart_str, notes }]
-const songFormOrder    = ref([])       // ordered section names for form_order
+const songFormSections = ref([])       // [{ id, name, chord_chart_str, notes, repeats }]
+const songFormOrder    = ref([])       // kept for compat; no longer driven from UI
 const sectionDragSrcIdx  = ref(null)
 const sectionDragOverIdx = ref(null)
+const chordPickerSectionId = ref(null)
+
+const ALL_ROOTS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']
+
+const diatonicPickerChords = computed(() => {
+  const { key_root, key_type } = songForm.value
+  if (!key_root) return []
+  const root = key_type === 'minor' ? getRelativeMajor(key_root) : key_root
+  return musicalKeys[root] ?? []
+})
+
+const formPreview = computed(() =>
+  songFormSections.value
+    .filter(s => s.name?.trim())
+    .map(s => {
+      const r = s.repeats ?? 1
+      return r > 1 ? `${s.name} ×${r}` : s.name
+    })
+    .join(' → ')
+)
+
+function chordQualityColor(chord) {
+  if (/dim$/.test(chord)) return 'error'
+  if (/m$/.test(chord)) return 'secondary'
+  return 'primary'
+}
+
+function sectionChordList(section) {
+  return section.chord_chart_str.split(',').map(c => c.trim()).filter(Boolean)
+}
+
+function addChordToSection(sectionId, chord) {
+  const section = songFormSections.value.find(s => s.id === sectionId)
+  if (!section) return
+  const existing = section.chord_chart_str.trim()
+  section.chord_chart_str = existing ? `${existing}, ${chord}` : chord
+}
+
+function removeChordFromSection(sectionId, idx) {
+  const section = songFormSections.value.find(s => s.id === sectionId)
+  if (!section) return
+  const chords = section.chord_chart_str.split(',').map(c => c.trim()).filter(Boolean)
+  chords.splice(idx, 1)
+  section.chord_chart_str = chords.join(', ')
+}
 
 function newSectionRow() {
-  return { id: crypto.randomUUID(), name: '', chord_chart_str: '', notes: '' }
+  return { id: crypto.randomUUID(), name: '', chord_chart_str: '', notes: '', repeats: 1 }
 }
 function addSection() {
   songFormSections.value.push(newSectionRow())
 }
 function removeSection(idx) {
-  const removed = songFormSections.value[idx]
   songFormSections.value.splice(idx, 1)
-  // Also remove from form order
-  if (removed.name) {
-    songFormOrder.value = songFormOrder.value.filter(n => n !== removed.name)
-  }
 }
 function onSectionDragStart(idx) { sectionDragSrcIdx.value = idx }
 function onSectionDrop(targetIdx) {
@@ -1290,6 +1374,7 @@ function openAddSong() {
   songFormMode.value = 'simple'
   songFormSections.value = []
   songFormOrder.value = []
+  chordPickerSectionId.value = null
   songFormError.value = ''
   spotifySearchQuery.value   = ''
   spotifyResults.value       = []
@@ -1311,15 +1396,19 @@ function openEditSong(song) {
   }
   const hasSec = Array.isArray(song.sections) && song.sections.length > 0
   songFormMode.value = hasSec ? 'full' : 'simple'
+  const repeatCount = {}
+  ;(song.form_order ?? []).forEach(name => { repeatCount[name] = (repeatCount[name] ?? 0) + 1 })
   songFormSections.value = hasSec
     ? song.sections.map(s => ({
         id: s.id,
         name: s.name,
         chord_chart_str: Array.isArray(s.chord_chart) ? s.chord_chart.join(', ') : '',
         notes: s.notes ?? '',
+        repeats: repeatCount[s.name] ?? 1,
       }))
     : []
-  songFormOrder.value = Array.isArray(song.form_order) ? [...song.form_order] : []
+  songFormOrder.value = []
+  chordPickerSectionId.value = null
   songFormError.value = ''
   spotifySearchQuery.value   = ''
   spotifyResults.value       = []
@@ -1375,7 +1464,9 @@ async function saveSong() {
         }
       }
 
-      formOrderPayload = [...songFormOrder.value]
+      formOrderPayload = songFormSections.value
+        .filter(s => s.name.trim())
+        .flatMap(s => Array(s.repeats ?? 1).fill(s.name))
       // Flatten unique chords for backward compat
       const allChords = [...new Set(sectionsPayload.flatMap(s => s.chord_chart))]
       topChords = allChords.length ? allChords : null
@@ -2190,5 +2281,63 @@ watch(currentUser, user => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ── Mode selector cards ────────────────────────────────────────────────── */
+.mode-card {
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 12px 10px;
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+.mode-card:hover {
+  border-color: rgba(200, 169, 110, 0.35);
+  background: rgba(200, 169, 110, 0.04);
+}
+.mode-card--active {
+  border-color: #C8A96E !important;
+  background: rgba(200, 169, 110, 0.08) !important;
+}
+.mode-card-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #E8E8E0;
+  margin-bottom: 2px;
+  font-family: 'Space Grotesk', sans-serif;
+}
+.mode-card-desc {
+  font-size: 0.7rem;
+  color: rgba(196, 196, 188, 0.5);
+  line-height: 1.3;
+}
+
+/* ── Add Section dashed button ──────────────────────────────────────────── */
+.add-section-btn {
+  border-style: dashed !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+}
+.add-section-btn:hover {
+  border-color: rgba(200, 169, 110, 0.45) !important;
+  background: rgba(200, 169, 110, 0.04) !important;
+}
+
+/* ── Reveal button pulse ────────────────────────────────────────────────── */
+.reveal-btn {
+  min-width: 160px;
+  max-width: 280px;
+  animation: pulse-border 2s ease-in-out infinite;
+}
+@keyframes pulse-border {
+  0%, 100% {
+    border-color: rgba(200, 169, 110, 0.5);
+    box-shadow: 0 0 0 0 rgba(200, 169, 110, 0);
+  }
+  50% {
+    border-color: rgba(200, 169, 110, 1);
+    box-shadow: 0 0 0 4px rgba(200, 169, 110, 0.12);
+  }
 }
 </style>
