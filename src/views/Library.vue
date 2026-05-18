@@ -1319,7 +1319,7 @@ async function rateSingleDrill(rating) {
   const score = rating === 'got_it' ? 100 : rating === 'almost' ? 60 : 0
   singleDrillSaving.value = true
   try {
-    await supabase.from('practice_sessions').insert({ song_id: singleDrillSong.value.id, score })
+    await supabase.from('practice_sessions').insert({ user_id: currentUser.value.id, song_id: singleDrillSong.value.id, score })
     // Patch local song confidence
     const local = songs.value.find(s => s.id === singleDrillSong.value.id)
     if (local) local.recentScores = [score, ...(local.recentScores ?? [])].slice(0, 3)

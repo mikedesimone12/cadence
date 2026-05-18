@@ -1922,7 +1922,7 @@ async function rateCurrentSong(rating) {
 
   drillSavingRating.value = true
   try {
-    await supabase.from('practice_sessions').insert({ song_id: song.id, score })
+    await supabase.from('practice_sessions').insert({ user_id: currentUser.value.id, song_id: song.id, score })
   } catch { /* non-blocking */ } finally {
     drillSavingRating.value = false
   }

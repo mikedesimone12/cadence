@@ -105,7 +105,7 @@ function extractFeatures(f) {
 
 // ── /api/explain ─────────────────────────────────────────────────────────────
 app.post('/api/explain', async (req, res) => {
-  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  const ip = req.ip;
   if (!checkRateLimit(ip, 'explain', 10)) {
     return res.status(429).json({ error: 'Too many requests. Try again later.' });
   }
@@ -148,7 +148,7 @@ app.post('/api/explain', async (req, res) => {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20240620',
+        model: 'claude-sonnet-4-5',
         max_tokens: 1000,
         system: EXPLANATION_SYSTEM_PROMPT,
         messages: [{ role: 'user', content: userContent }],
@@ -165,7 +165,7 @@ app.post('/api/explain', async (req, res) => {
 // ── /api/spotify/search ───────────────────────────────────────────────────────
 app.get('/api/spotify/search', async (req, res) => {
   try {
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const ip = req.ip;
     if (!checkRateLimit(ip, 'spotify_search', 30)) {
       return res.status(429).json({ error: 'Too many searches. Try again later.' });
     }
@@ -217,7 +217,7 @@ app.get('/api/spotify/search', async (req, res) => {
 // unavailable (deprecated for newer apps) or return no key/BPM.
 app.get('/api/spotify/features/:trackId', async (req, res) => {
   try {
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const ip = req.ip;
     if (!checkRateLimit(ip, 'spotify_features', 30)) {
       return res.status(429).json({ error: 'Too many requests. Try again later.' });
     }
@@ -269,13 +269,13 @@ app.get('/api/getsongbpm', async (req, res) => {
   if (!apiKey) return res.json({ bpm: null, key: null, keyType: null });
 
   try {
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const ip = req.ip;
     if (!checkRateLimit(ip, 'getsongbpm', 30)) {
       return res.status(429).json({ error: 'Too many requests. Try again later.' });
     }
 
-    const title  = req.query.title?.trim();
-    const artist = req.query.artist?.trim();
+    const title  = req.query.title?.trim().replace(/[^a-zA-Z0-9\s\-'.,&]/g, '').slice(0, 200);
+    const artist = req.query.artist?.trim().replace(/[^a-zA-Z0-9\s\-'.,&]/g, '').slice(0, 200);
     if (!title) return res.status(400).json({ error: 'title required' });
 
     const lookup = [artist, title].filter(Boolean).join(' ');
@@ -304,13 +304,13 @@ app.get('/api/getsongbpm', async (req, res) => {
 // Runs server-side to set a valid User-Agent (MB requires it) and avoid CORS.
 app.get('/api/musicbrainz', async (req, res) => {
   try {
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const ip = req.ip;
     if (!checkRateLimit(ip, 'musicbrainz', 20)) {
       return res.status(429).json({ error: 'Too many requests. Try again later.' });
     }
 
-    const title  = req.query.title?.trim();
-    const artist = req.query.artist?.trim();
+    const title  = req.query.title?.trim().replace(/[^a-zA-Z0-9\s\-'.,&]/g, '').slice(0, 200);
+    const artist = req.query.artist?.trim().replace(/[^a-zA-Z0-9\s\-'.,&]/g, '').slice(0, 200);
     if (!title) return res.status(400).json({ error: 'title required' });
 
     const UA = 'Cadence/1.0 (music practice app; cadence-491202.uc.r.appspot.com)';

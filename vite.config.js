@@ -39,6 +39,9 @@ export default defineConfig({
     headers: {
       'X-Frame-Options': 'DENY',
       'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+      'Permissions-Policy': 'microphone=(), camera=(), geolocation=()',
+      'X-XSS-Protection': '1; mode=block',
     },
   },
 })
