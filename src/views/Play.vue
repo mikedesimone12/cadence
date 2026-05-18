@@ -341,18 +341,8 @@
         </div>
       </v-expand-transition>
 
-      <!-- Chart grid (only shown when stopped) -->
-      <div v-if="!isPlaying && chartBars.length" class="chart-grid mb-3">
-        <!-- Beat number header (FIX 2) -->
-        <div class="chart-header-row">
-          <div class="chart-bar-col"></div>
-          <div class="chart-cells-row" :style="{ gridTemplateColumns: `repeat(${chartBars[0].beats.length}, minmax(0, 200px))` }">
-            <div v-for="bi in chartBars[0].beats.length" :key="bi" class="chart-beat-label">{{ bi }}</div>
-          </div>
-          <div class="chart-remove-col"></div>
-        </div>
-
-        <!-- Bar rows -->
+      <!-- Chart grid — always visible when bars exist; active beat highlighted during playback -->
+      <div v-if="chartBars.length" class="chart-grid mb-3">
         <div
           v-for="(bar, barIdx) in chartBars"
           :key="bar.id"
@@ -360,10 +350,18 @@
           class="chart-bar"
           :class="{ 'chart-bar--active': isPlaying && chartPosition.bar === barIdx }"
         >
-          <!-- Bar number column (FIX 1) -->
-          <div class="chart-bar-col" :class="{ 'chart-bar-col--active': isPlaying && chartPosition.bar === barIdx }">
-            {{ barIdx + 1 }}
-          </div>
+          <!-- Bar label (top-left inside card) -->
+          <div class="chart-bar-label">Bar {{ barIdx + 1 }}</div>
+
+          <!-- Delete button (absolute top-right; only when >1 bar) -->
+          <v-btn
+            v-if="chartBars.length > 1"
+            icon size="x-small" variant="text"
+            class="chart-remove-btn-inner"
+            @click="removeChartBar(barIdx)"
+          >
+            <v-icon size="14">mdi-close</v-icon>
+          </v-btn>
 
           <!-- Beat cells -->
           <div class="chart-cells-row" :style="{ gridTemplateColumns: `repeat(${bar.beats.length}, minmax(0, 200px))` }">
@@ -378,16 +376,19 @@
               }"
               @click="openPicker(barIdx, beatIdx, $event)"
             >
+              <!-- Beat number: top-left, tiny, muted -->
+              <span class="chart-beat-num">{{ beatIdx + 1 }}</span>
+              <!-- Assigned chord -->
               <span v-if="beat.chord" class="chart-beat-name">{{ toDisplay(beat.chord) }}</span>
+              <!-- Continuation ghost: empty beat after a filled beat -->
+              <span
+                v-else-if="sustainingChord(bar, beatIdx)"
+                class="chart-beat-continuation"
+                :style="{ color: sustainChordColor(sustainingChord(bar, beatIdx)) }"
+              >{{ toDisplay(sustainingChord(bar, beatIdx)) }}</span>
+              <!-- Empty hint -->
               <span v-else class="chart-beat-plus">+</span>
             </div>
-          </div>
-
-          <!-- Remove bar (FIX 8) -->
-          <div class="chart-remove-col">
-            <v-btn icon size="x-small" variant="text" class="chart-remove-btn" @click="removeChartBar(barIdx)">
-              <v-icon size="14">mdi-close</v-icon>
-            </v-btn>
           </div>
         </div>
       </div>
@@ -401,16 +402,24 @@
         </v-btn>
       </div>
 
-      <!-- Add bar + load from song + clear -->
-      <div class="d-flex align-center mb-4" style="gap:8px">
-        <v-btn variant="outlined" size="small" color="primary" prepend-icon="mdi-plus" @click="addChartBar">
-          Add Bar
-        </v-btn>
+      <!-- Chart controls: Add Bar | Load Song | Save as Song | Clear -->
+      <div :class="smAndDown ? 'd-flex flex-column mb-4' : 'd-flex align-center mb-4'" style="gap:8px">
+        <v-btn
+          variant="outlined" size="small" color="primary" prepend-icon="mdi-plus"
+          :block="smAndDown"
+          @click="addChartBar"
+        >Add Bar</v-btn>
+
         <v-menu v-if="currentUser" v-model="chartSongMenuOpen" :close-on-content-click="false" max-height="320">
           <template #activator="{ props }">
-            <v-btn v-bind="props" variant="text" size="small" color="secondary" prepend-icon="mdi-playlist-music-outline" :loading="loadingSongs" @click="fetchUserSongs">
-              Load song
-            </v-btn>
+            <v-btn
+              v-bind="props"
+              variant="text" size="small" color="secondary"
+              prepend-icon="mdi-playlist-music-outline"
+              :loading="loadingSongs"
+              :block="smAndDown"
+              @click="fetchUserSongs"
+            >Load song</v-btn>
           </template>
           <v-list density="compact" min-width="240">
             <v-list-item v-if="!userSongs.length && !loadingSongs" disabled>
@@ -422,7 +431,16 @@
             </v-list-item>
           </v-list>
         </v-menu>
-        <v-spacer />
+
+        <v-btn
+          v-if="currentUser && chartBars.length"
+          variant="text" size="small" color="primary"
+          prepend-icon="mdi-content-save-outline"
+          :block="smAndDown"
+          @click="openChartSaveDialog"
+        >Save as song</v-btn>
+
+        <v-spacer v-if="!smAndDown" />
         <v-btn v-if="chartBars.length" variant="text" size="x-small" color="error" @click="clearChartConfirmOpen = true">
           Clear chart
         </v-btn>
@@ -758,6 +776,56 @@
       <v-btn variant="text" size="small" @click="showHint = false">Got it</v-btn>
     </template>
   </v-snackbar>
+
+  <!-- Save chart as song dialog -->
+  <v-dialog v-model="chartSaveDialogOpen" max-width="380" :persistent="savingChart">
+    <v-card>
+      <v-card-title class="pt-5 pb-0 px-5" style="font-family: 'Space Grotesk', sans-serif">
+        Save as Song
+      </v-card-title>
+      <v-card-text class="px-5 pt-3">
+        <v-text-field
+          v-model="chartSaveForm.title"
+          label="Title *"
+          variant="outlined" density="compact" hide-details
+          class="mb-3" autofocus
+        />
+        <v-text-field
+          v-model="chartSaveForm.artist"
+          label="Artist"
+          variant="outlined" density="compact" hide-details
+          class="mb-3"
+        />
+        <v-text-field
+          :model-value="bpm"
+          label="BPM"
+          variant="outlined" density="compact" hide-details
+          readonly
+        />
+        <v-alert
+          v-if="chartSaveError"
+          type="error" variant="tonal" density="compact" closable class="mt-3"
+          @click:close="chartSaveError = ''"
+        >{{ chartSaveError }}</v-alert>
+      </v-card-text>
+      <v-card-actions class="px-5 pb-4 pt-0">
+        <v-spacer />
+        <v-btn variant="text" size="small" color="secondary" @click="chartSaveDialogOpen = false">Cancel</v-btn>
+        <v-btn
+          color="primary" variant="flat" size="small"
+          :loading="savingChart"
+          :disabled="!chartSaveForm.title.trim()"
+          @click="saveChartAsSong"
+        >Save</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Save chart success toast -->
+  <v-snackbar v-model="chartSavedSnackbar" location="bottom" :timeout="3000" color="success" rounded="lg">
+    <v-icon size="16" class="mr-1">mdi-check-circle-outline</v-icon>
+    Saved to Library
+  </v-snackbar>
 </template>
 
 <script setup>
@@ -872,6 +940,13 @@ const showHint              = ref(false)
 const chartRowRefs          = []
 let _chartBar               = 0
 let _draftTimer             = null
+
+// Save chart as song
+const chartSaveDialogOpen = ref(false)
+const savingChart         = ref(false)
+const chartSaveError      = ref('')
+const chartSaveForm       = ref({ title: '', artist: '' })
+const chartSavedSnackbar  = ref(false)
 
 // ─── Audio ───────────────────────────────────────────────────────────────────
 
@@ -1288,6 +1363,72 @@ function clearChartBeat(barIdx, beatIdx) {
   chartBars.value[barIdx].beats[beatIdx].chord = null
 }
 
+function sustainingChord(bar, beatIdx) {
+  for (let i = beatIdx - 1; i >= 0; i--) {
+    if (bar.beats[i].chord) return bar.beats[i].chord
+  }
+  return null
+}
+
+function sustainChordColor(chord) {
+  if (chord?.endsWith('dim')) return 'rgba(232,87,42,0.5)'
+  if (chord?.endsWith('m'))   return 'rgba(110,142,173,0.5)'
+  return 'rgba(200,169,110,0.5)'
+}
+
+function openChartSaveDialog() {
+  chartSaveForm.value = { title: '', artist: '' }
+  chartSaveError.value = ''
+  chartSaveDialogOpen.value = true
+}
+
+async function saveChartAsSong() {
+  if (!chartSaveForm.value.title.trim()) return
+  savingChart.value = true
+  chartSaveError.value = ''
+
+  const titleVal = validateText(chartSaveForm.value.title, 'Title', 200)
+  if (!titleVal.valid) { chartSaveError.value = titleVal.error; savingChart.value = false; return }
+
+  const artistRaw = chartSaveForm.value.artist.trim()
+  if (artistRaw) {
+    const artistVal = validateText(artistRaw, 'Artist', 200)
+    if (!artistVal.valid) { chartSaveError.value = artistVal.error; savingChart.value = false; return }
+  }
+
+  try {
+    const seen = new Set()
+    const chords = []
+    for (const bar of chartBars.value) {
+      for (const beat of bar.beats) {
+        if (beat.chord && !seen.has(beat.chord)) {
+          seen.add(beat.chord)
+          chords.push(sanitizeChord(beat.chord))
+        }
+      }
+    }
+    const key = selectedKey.value + (keyType.value === 'minor' ? 'm' : '')
+    const majorRoot = keyType.value === 'minor' ? relativeMajorRoot.value : selectedKey.value
+    const nnsChart = chords.length ? progressionToNNS(chords, majorRoot).map(n => n ?? '?') : null
+    const { error } = await supabase.from('songs').insert({
+      user_id:     currentUser.value.id,
+      title:       sanitizeText(chartSaveForm.value.title),
+      artist:      artistRaw ? sanitizeText(artistRaw) : null,
+      bpm:         bpm.value || null,
+      key,
+      chord_chart: chords,
+      nns_chart:   nnsChart,
+    })
+    if (error) throw error
+    chartSaveDialogOpen.value = false
+    chartSavedSnackbar.value  = true
+  } catch (e) {
+    chartSaveError.value = e.message
+  } finally {
+    savingChart.value = false
+  }
+}
+
 function loadChartFromSong(song) {
   if (isPlaying.value) stopPlayback()
   if (!Array.isArray(song.chord_chart) || !song.chord_chart.length) return
@@ -1525,6 +1666,7 @@ onBeforeRouteLeave(() => {
   clearChartConfirmOpen.value = false
   removeBarConfirmOpen.value  = false
   chartSongMenuOpen.value     = false
+  chartSaveDialogOpen.value   = false
 })
 </script>
 
@@ -1789,7 +1931,7 @@ onBeforeRouteLeave(() => {
   opacity: 0.75;
 }
 
-/* ── Chart: inline playback display (FIX 6) ─────────────────────────────── */
+/* ── Chart: inline playback display ─────────────────────────────────────── */
 .chart-playback-display {
   text-align: center;
   padding: 12px 0 8px;
@@ -1827,100 +1969,72 @@ onBeforeRouteLeave(() => {
   text-align: center;
 }
 
-/* ── Chart grid (FIX 1, 2) ──────────────────────────────────────────────── */
+/* ── Chart grid ─────────────────────────────────────────────────────────── */
 .chart-grid {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
 }
 
-/* Header row with beat numbers */
-.chart-header-row {
-  display: flex;
-  align-items: center;
-  margin-bottom: 2px;
-  padding: 0 2px;
-}
-
-/* Shared column: bar number (FIX 1) */
-.chart-bar-col {
-  width: 32px;
-  min-width: 32px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'Space Grotesk', monospace;
-  font-size: 0.62rem;
-  font-weight: 600;
-  color: rgba(255,255,255,0.25);
-  border-right: 1px solid rgba(255,255,255,0.07);
-  align-self: stretch;
-}
-.chart-bar-col--active { color: #C8A96E; }
-
-/* Header beat number labels (FIX 2) */
-.chart-beat-label {
-  text-align: center;
-  font-size: 9px;
-  color: rgba(255,255,255,0.3);
-  letter-spacing: 0.04em;
-  user-select: none;
-}
-
-/* Shared beat cells row (grid, max 200px per cell) */
-.chart-cells-row {
-  display: grid;
-  flex: 1;
-  gap: 5px;
-  padding: 0 8px;
-  align-items: center;
-}
-
-/* Remove button col */
-.chart-remove-col {
-  width: 28px;
-  min-width: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.chart-remove-btn { opacity: 0.35 !important; }
-.chart-remove-btn:hover { opacity: 0.8 !important; }
-
-/* Bar row */
+/* Bar card */
 .chart-bar {
-  display: flex;
-  align-items: stretch;
+  position: relative;
   border-radius: 10px;
   border: 1px solid rgba(255,255,255,0.06);
   background: rgba(255,255,255,0.02);
-  overflow: hidden;
-  transition: border-color 0.2s, background 0.2s;
+  padding: 6px 8px 8px;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
 }
 .chart-bar--active {
-  border-color: rgba(200,169,110,0.35);
+  border-color: rgba(200,169,110,0.4);
   background: rgba(200,169,110,0.05);
+  box-shadow: 0 0 12px rgba(200,169,110,0.15);
 }
 
-/* Beat cells (FIX 5, 7) */
+/* Bar label inside card (Bug 2) */
+.chart-bar-label {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.4);
+  margin-bottom: 6px;
+  padding-right: 28px; /* leave room for delete button */
+  user-select: none;
+}
+
+/* Delete button: absolute top-right inside card (Bug 5) */
+.chart-remove-btn-inner {
+  position: absolute !important;
+  top: 6px !important;
+  right: 6px !important;
+  opacity: 0.3 !important;
+  transition: opacity 0.15s !important;
+}
+.chart-remove-btn-inner:hover { opacity: 0.85 !important; }
+
+/* Beat cells row */
+.chart-cells-row {
+  display: grid;
+  gap: 5px;
+  align-items: center;
+}
+
+/* Beat cell (Bug 3 + Bug 6) */
 .chart-beat {
+  position: relative;
   min-height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 6px;
-  border: 1px dashed rgba(255,255,255,0.15);
+  border: 1px dashed rgba(255,255,255,0.08);
   background: transparent;
   cursor: pointer;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   transition: border-color 0.1s, background 0.1s, transform 0.08s;
-  margin: 6px 0;
 }
 .chart-beat:hover:not(.chart-beat--filled):not(.chart-beat--active) {
-  border-color: rgba(255,255,255,0.3);
+  border-color: rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.02);
 }
 .chart-beat:active { transform: scale(0.93); }
 
@@ -1928,16 +2042,36 @@ onBeforeRouteLeave(() => {
   border: 1px solid rgba(200,169,110,0.3);
   background: rgba(200,169,110,0.10);
 }
+
+/* Active beat: gold background, dark text (Bug 6) */
 .chart-beat--active {
-  border: 2px solid #C8A96E !important;
-  background: rgba(200,169,110,0.15) !important;
+  background: rgb(var(--v-theme-primary)) !important;
+  border-color: transparent !important;
   box-shadow: 0 0 12px rgba(200,169,110,0.3) !important;
-  transform: scale(1.03);
+  transform: scale(1.02);
   transition: all 100ms ease !important;
 }
+.chart-beat--active .chart-beat-name { color: #0D0D0F; }
+.chart-beat--active .chart-beat-num  { color: rgba(0,0,0,0.35); }
+
 .chart-beat--target {
   border: 1px solid rgba(110,142,173,0.6) !important;
   background: rgba(110,142,173,0.10) !important;
+}
+
+/* Beat number inside cell: top-left, tiny, muted (Bug 1) */
+.chart-beat-num {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 9px;
+  font-family: 'Space Grotesk', monospace;
+  font-weight: 600;
+  color: rgba(255,255,255,1);
+  opacity: 0.35;
+  line-height: 1;
+  user-select: none;
+  pointer-events: none;
 }
 
 .chart-beat-name {
@@ -1947,11 +2081,32 @@ onBeforeRouteLeave(() => {
   color: #C8A96E;
   letter-spacing: -0.02em;
 }
+
+/* Sustain ghost: faint italic chord name in empty cell (Bug 4) */
+.chart-beat-continuation {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.65rem;
+  font-style: italic;
+  font-weight: 500;
+  pointer-events: none;
+  user-select: none;
+}
+
 .chart-beat-plus {
-  font-size: 1.2rem;
-  color: rgba(255,255,255,0.2);
+  font-size: 1rem;
+  color: rgba(255,255,255,0.12);
   font-weight: 300;
   line-height: 1;
+}
+
+/* Mobile: bigger tap targets + stacked controls (Bug 7) */
+@media (max-width: 599px) {
+  .chart-beat {
+    min-height: 64px;
+  }
+  .chart-beat-name {
+    font-size: 0.95rem;
+  }
 }
 
 /* ── Chord picker tiles (FIX 10) ─────────────────────────────────────────── */
