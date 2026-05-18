@@ -23,15 +23,31 @@
     <v-btn-toggle
       v-model="playMode"
       mandatory density="compact" variant="outlined" color="primary"
-      class="mb-5" style="width: 100%"
+      class="mb-2" style="width: 100%"
     >
       <v-btn value="simple" style="flex: 1">
-        <v-icon size="15" class="mr-1">mdi-repeat</v-icon>Loop
+        <v-icon size="15" class="mr-1">mdi-repeat</v-icon>Simple Loop
       </v-btn>
       <v-btn value="chart" style="flex: 1">
-        <v-icon size="15" class="mr-1">mdi-view-grid-outline</v-icon>Chart
+        <v-icon size="15" class="mr-1">mdi-view-grid-outline</v-icon>Chord Chart
       </v-btn>
     </v-btn-toggle>
+    <v-fade-transition>
+      <div
+        v-if="playMode === 'simple'"
+        key="desc-simple"
+        style="font-size: 0.8rem; color: rgba(255,255,255,0.45); margin-top: 6px; text-align: center; margin-bottom: 16px"
+      >
+        Pick chords and loop them at any BPM — great for jamming and ear training
+      </div>
+      <div
+        v-else
+        key="desc-chart"
+        style="font-size: 0.8rem; color: rgba(255,255,255,0.45); margin-top: 6px; text-align: center; margin-bottom: 16px"
+      >
+        Arrange chords by measure with real beat durations — practice songs as written
+      </div>
+    </v-fade-transition>
 
     <!-- ── Settings dialog ───────────────────────────────────────────────── -->
     <v-dialog v-model="settingsOpen" max-width="320">
