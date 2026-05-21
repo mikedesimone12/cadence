@@ -148,7 +148,7 @@ app.post('/api/explain', async (req, res) => {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        model: 'claude-sonnet-4-6',
         max_tokens: 1000,
         system: EXPLANATION_SYSTEM_PROMPT,
         messages: [{ role: 'user', content: userContent }],
@@ -405,11 +405,15 @@ app.post('/api/suggest-songs', async (req, res) => {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 2000, system: SUGGEST_SONGS_SYSTEM,
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000, system: SUGGEST_SONGS_SYSTEM,
         messages: [{ role: 'user', content: userContent }] }),
     });
 
-    if (!response.ok) return res.status(502).json({ error: 'AI service error' });
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => '(unreadable)');
+      console.error('suggest-songs Anthropic error:', { status: response.status, body: errBody.slice(0, 500) });
+      return res.status(502).json({ error: 'AI service error', detail: `Anthropic ${response.status}` });
+    }
     const data    = await response.json();
     const rawText = data.content?.[0]?.text ?? '';
     let parsed;
@@ -423,10 +427,31 @@ app.post('/api/suggest-songs', async (req, res) => {
       return res.status(500).json({ error: 'Unexpected AI response format.' });
     res.json({ suggestions: parsed.suggestions });
   } catch (err) {
-    console.error('suggest-songs error:', err.message);
+    console.error('suggest-songs error:', {
+      message: err.message,
+      stack: err.stack,
+      response: err.response?.data,
+    });
     res.status(500).json({ error: err.message });
   }
 });
+
+// ── Chord simplification (triad extractor) ────────────────────────────────────
+function simplifyToTriad(chord) {
+  const match = chord.match(/^([A-G][#b]?)(m(?!aj)|dim|aug)?/);
+  if (!match) return null;
+  const root    = match[1];
+  const quality = match[2] === 'aug' ? '' : (match[2] || '');
+  return root + quality;
+}
+
+function simplifyProgression(chords) {
+  if (!Array.isArray(chords)) return [];
+  return chords
+    .map(simplifyToTriad)
+    .filter(Boolean)
+    .filter((ch, i, arr) => ch !== arr[i - 1]);
+}
 
 // ── /api/sound-like ──────────────────────────────────────────────────────────
 const SOUND_LIKE_SYSTEM =
@@ -465,7 +490,7 @@ app.post('/api/sound-like', async (req, res) => {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 1500, system: SOUND_LIKE_SYSTEM,
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1500, system: SOUND_LIKE_SYSTEM,
         messages: [{ role: 'user', content: userContent }] }),
     });
 
@@ -481,7 +506,11 @@ app.post('/api/sound-like', async (req, res) => {
     }
     if (!Array.isArray(parsed.progressions))
       return res.status(500).json({ error: 'Unexpected AI response format.' });
-    res.json({ progressions: parsed.progressions });
+    const safeProgressions = parsed.progressions.map(prog => ({
+      ...prog,
+      chords: Array.isArray(prog.chords) ? simplifyProgression(prog.chords) : [],
+    }));
+    res.json({ progressions: safeProgressions });
   } catch (err) {
     console.error('sound-like error:', err.message);
     res.status(500).json({ error: err.message });

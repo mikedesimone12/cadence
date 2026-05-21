@@ -581,8 +581,11 @@
           </div>
 
           <!-- NNS -->
-          <div class="d-flex flex-wrap mb-3" style="gap:4px">
+          <div class="d-flex flex-wrap" style="gap:4px" :class="prog.wasSimplified ? 'mb-1' : 'mb-3'">
             <span v-for="(n, ni) in prog.nns" :key="ni" class="chip-nns-style">{{ n }}</span>
+          </div>
+          <div v-if="prog.wasSimplified" style="font-size:0.7rem;color:rgba(255,255,255,0.3);margin-top:4px;margin-bottom:12px;font-style:italic">
+            Simplified to triads · Full voicings in Phase 2
           </div>
 
           <div class="text-caption text-medium-emphasis mb-3" style="line-height:1.65;font-style:italic">{{ prog.explanation }}</div>
@@ -648,7 +651,7 @@ import { useAudio } from '../composables/useAudio'
 import { useAuth } from '../composables/useAuth'
 import { supabase } from '../lib/supabase'
 import ChordVisualizer from '../components/ChordVisualizer.vue'
-import { sanitizeText, sanitizeChord } from '../utils/sanitize'
+import { sanitizeText, sanitizeChord, simplifyProgression } from '../utils/sanitize'
 import { validateText, validateBPM } from '../utils/validate'
 
 defineOptions({ name: 'ExploreView' })
@@ -1103,7 +1106,18 @@ async function generateSoundLike() {
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.error || 'Request failed')
-    soundLikeResults.value = Array.isArray(data.progressions) ? data.progressions : []
+    soundLikeResults.value = (Array.isArray(data.progressions) ? data.progressions : []).map(prog => {
+      const original   = prog.chords || []
+      const simplified = simplifyProgression(original)
+      const wasSimplified = simplified.join(',') !== original.join(',')
+      const finalChords = wasSimplified ? simplified : original
+      return {
+        ...prog,
+        chords:       finalChords,
+        nns:          progressionToNNS(finalChords, prog.key),
+        wasSimplified,
+      }
+    })
   } catch (err) {
     soundLikeError.value = err.message || 'Something went wrong. Try again.'
   } finally {

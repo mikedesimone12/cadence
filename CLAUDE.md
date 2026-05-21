@@ -1,137 +1,266 @@
-# Cadence — Vue POC
+# Cadence — Vue POC (cadence-poc-vue)
 
 ## What This App Is
-Cadence is a musician's rehearsal and theory companion for gigging and cover musicians.
-It helps musicians understand music theory, prepare for gigs, practice chord charts,
+Cadence is a musician's rehearsal and theory
+companion for gigging and cover musicians.
+Helps musicians understand music theory,
+prepare for gigs, practice chord charts,
 and play along with progressions.
 
-Target user: working/gigging musician who plays by ear or chord chart. Not a
+Target user: working/gigging musician who
+plays by ear or chord chart. Not a
 conservatory student.
 
-Tagline: "The tool that bridges music theory and the gig"
+Tagline: "The tool that bridges music theory
+and the gig"
 
----
+Status: Feature complete Vue POC — v1.2
+Flutter rewrite in progress (separate repo)
 
 ## Tech Stack
+Frontend:
 - Vue 3 + Composition API
 - Vuetify 3 (dark gold theme)
-- Vite
-- Vue Router 4 (bottom nav, 4 tabs)
-- Supabase (Postgres + Auth + RLS)
-- Tone.js + soundfont-player (audio engine)
-- Anthropic Claude API (explain progression feature)
-- GCP App Engine (deployment)
+- Vite + Vue Router 4
+- Bottom nav, 4 tabs
 
----
+Backend/Services:
+- Supabase (Postgres + Auth + RLS)
+- Express server.js (API proxy for secrets)
+- Tone.js + soundfont-player (audio engine)
+- Anthropic Claude API (3 AI features)
+- Spotify API (song metadata)
+- GCP App Engine (deployment)
 
 ## Project Structure
 ```
 src/
   core/
-    musicTheory.js     — pure music theory functions
-                         (no Vue dependencies)
-                         exports: musicalKeys,
-                         noteToSharp, checkKeys,
-                         existsInKey, chordToNNS,
-                         progressionToNNS,
-                         transposeChord,
-                         transposeProgression,
-                         transposeSections,
-                         getCapoSuggestion,
-                         getRelativeMajor,
-                         COMMON_PROGRESSIONS
-    chordVoicings.js   — guitar + piano voicing data
-                         exports: getGuitarVoicings,
-                         getPianoVoicing
+    musicTheory.js
+      Pure music theory functions, no Vue deps.
+      Portable to Flutter (Dart port planned).
+      Exports:
+        musicalKeys — 12 keys, diatonic triads
+        noteToSharp(note)
+        checkKeys(chordList)
+        existsInKey(keyList, chordList)
+        chordToNNS(chord, keyRoot)
+        progressionToNNS(chords, keyRoot)
+        transposeChord(chord, fromKey, toKey)
+        transposeProgression(chords, from, to)
+        transposeSections(sections, from, to)
+        getCapoSuggestion(fromKey, toKey)
+        getRelativeMajor(minorRoot)
+        COMMON_PROGRESSIONS (with examples)
+
+    chordVoicings.js
+      Guitar + piano voicing data.
+      Standard tuning EADGBE only.
+      Covers all 12 major, minor, dim triads.
+      NOTE: triads only — 7ths in Phase 2.
+      Exports:
+        getGuitarVoicings(chordName)
+        getPianoVoicing(chordName)
+
   composables/
-    useAudio.js        — singleton audio engine
-                         (Tone.js + soundfont-player)
-                         exports: loadInstruments,
-                         playChord, playScale,
-                         playNote, stopAll,
-                         activeInstrument,
-                         bassEnabled, volume,
-                         isLoaded
-    useRhythm.js       — singleton drum machine
-                         exports: rhythmMode,
-                         rhythmVolume, swingAmount,
-                         startDrums, stopDrums,
-                         setRhythmVolume, setSwingAmount
-    useAuth.js         — Supabase auth singleton
-                         exports: currentUser,
-                         signInWithEmail, signUp,
-                         signInWithGoogle, signOut
+    useAudio.js
+      Singleton audio engine (Tone.js).
+      Shared across ALL tabs.
+      Instruments: piano, guitar, both
+        piano: acoustic_grand_piano (soundfont)
+        guitar: acoustic_guitar_steel (soundfont)
+        bass: acoustic_bass (soundfont)
+      Rhythm section (Play tab):
+        Off, Click (MetalSynth),
+        Acoustic (MembraneSynth + NoiseSynth),
+        Hip-Hop (808 MembraneSynth + swing)
+      Exports:
+        loadInstruments()
+        playChord(chordName)
+        playScale(root, type)
+        playNote(note)
+        stopAll()
+        activeInstrument ref
+        bassEnabled ref
+        volume ref
+        isLoaded ref
+
+    useAuth.js
+      Supabase auth singleton.
+      Shared globally — no Vuex/Pinia needed.
+      Exports:
+        currentUser ref
+        signInWithEmail(email, password)
+        signUp(email, password)
+        signInWithGoogle()
+        signOut()
+
   lib/
-    supabase.js        — Supabase client singleton
+    supabase.js — single shared client instance
+
   services/
-    spotifySearch.js   — Spotify search client service
+    chordImport.js — Spotify + Claude AI import
+                     (partial — Session 10 pending)
+
   utils/
-    sanitize.js        — DOMPurify wrappers
-                         exports: sanitizeText,
-                         sanitizeChord
-    validate.js        — input validation
-                         exports: validateBPM,
-                         validateText, validateChord,
-                         validateChordChart
+    sanitize.js
+      DOMPurify text sanitization.
+      Exports:
+        sanitizeText(str)
+        sanitizeChord(chord)
+        validateBpm(bpm)
+        simplifyToTriad(chord)
+        simplifyProgression(chords)
+          Used in Sound Like feature —
+          strips extended chords to triads
+          ONLY on Load to Explore/Play actions
+          NOT on display cards
+
   components/
-    AuthModal.vue      — email/Google auth dialog
-    ChordVisualizer.vue — wrapper (guitar or piano
-                          based on activeInstrument)
-    GuitarFretboard.vue — SVG fretboard, lefty toggle,
-                          voicing carousel
-    PianoKeyboard.vue  — SVG piano, dynamic mobile
-                          viewport centering
-    SongImportDialog.vue — Spotify search +
-                           autocomplete, form fill
+    AuthModal.vue
+      Email/Google auth dialog.
+      Mounted globally in App.vue.
+
+    ChordVisualizer.vue
+      Wrapper — shows piano or guitar or both
+      based on activeInstrument from useAudio.
+      Props: chordName, compact (bool)
+
+    GuitarFretboard.vue
+      SVG fretboard, standard tuning.
+      Features: voicing carousel (3 voicings),
+      lefty toggle (persisted to localStorage),
+      auto-adjusts viewBox for barre chords.
+      localStorage key: cadence_lefty_mode
+
+    PianoKeyboard.vue
+      SVG piano keyboard.
+      Desktop: 2 octaves (C3-B4)
+      Mobile: dynamic viewport — centers on
+      root note of chord being displayed.
+      Middle C reference marker always visible.
+      Safari/WebKit clipping fixes applied.
+
+    SongImportDialog.vue
+      Spotify search + Claude AI chord suggestion.
+      (Partial — needs Chordify API for full impl)
+
   views/
-    Explore.vue        — key finder, chord grid
-                         (circle of fifths order,
-                         color coded by quality),
-                         substitution suggester,
-                         "explain this to me"
-                         (Claude API),
-                         common progressions library
-    Gig.vue            — setlist builder, song manager
-                         (full song form with sections),
-                         NNS conversion, drill mode
-                         (6 drill types), transpose tool,
-                         capo calculator
-    Play.vue           — Simple Loop mode +
-                         Chord Chart mode (measure editor),
-                         rhythm section (10 modes),
-                         chord visualizer, BPM + tap tempo
-    Library.vue        — saved songs, practice stats,
-                         SVG progress chart,
-                         achievements, activity feed,
-                         single-song drill mode
+    Explore.vue (ExploreView)
+      Key finder with chord grid:
+        Circle of fifths order
+        Color coded: gold=major, blue=minor,
+        ember=diminished
+        Tooltips with chord tones + theory context
+      Features:
+        Live key detection as chords selected
+        Chord substitution suggester
+        "Explain this to me" (Claude API)
+        "Explain differently" button
+        Common progressions library
+          (4 categories, examples per progression)
+        Sound Like generator (Claude API)
+          Shows full extended chords on cards
+          Simplifies to triads on Load actions
+        Chord visualizer on click
+      Settings gear: notation, instrument,
+        bass toggle, volume, show fingering
+
+    Gig.vue (GigView)
+      Two panel layout (desktop), stacked (mobile).
+      Left: Setlist Manager
+        CRUD setlists with gig date + venue
+        Countdown chip (red≤7d, amber≤30d, green)
+        Practice button per setlist
+      Right: Song Manager
+        Songs with drag-to-reorder
+        Full song form:
+          Simple mode: flat chord chart
+          Full Form mode:
+            Section definitions (chord picker popup)
+            Form order builder (tap to add sections,
+            sections reusable multiple times)
+            Repeat not needed — reuse sections freely
+        NNS auto-conversion per song
+        Confidence dots (green/yellow/red/grey)
+        Transpose tool + capo calculator
+        "Open in Play" cross-tab navigation
+        Setlist Song Suggester (Claude AI):
+          Context form: venue, vibe, genre, length
+          Returns 8-10 suggestions with reasons
+          "+ ADD" pre-populates song form
+      Drill Mode (fullscreen):
+        6 drill types:
+          1. NNS Flash
+          2. Transpose Drill
+          3. Reverse Drill
+          4. Form Drill (requires sections)
+          5. Section Flash (requires sections)
+          6. Transition Drill (requires form_order)
+        Scoring: Got it=100, Almost=60, Missed=0
+        Spaced repetition: Missed songs queue first
+        Gig urgency banner if ≤7 days to gig
+        Chord visualizer on reveal (compact)
+
+    Play.vue (PlayView)
+      Two modes — toggle at top:
+
+      SIMPLE LOOP MODE:
+        Key selector (12 notes, major/minor)
+        Chord pad (7 diatonic chords, NNS labeled)
+        Progression chips (draggable)
+        BPM slider (40-200) + tap tempo
+        Rhythm section toggle:
+          Off | Click | Acoustic | Hip-Hop
+        Transport: Play/Stop
+        Load from song (Supabase)
+        Save progression (Supabase)
+        Chord visualizer (updates during playback)
+
+      CHORD CHART MODE:
+        Measure grid editor (4/4 or 3/4)
+        Beat cells — tap to assign chord
+        Chord picker popup per beat
+        Chord span visual (ghost chord in empty beats)
+        Drag to reorder measures
+        Add/delete bars
+        Playback highlights active beat (gold)
+        BPM + rhythm section same as Simple Loop
+        Load from song (with section selector)
+        Save as song (Supabase)
+
+    Library.vue (LibraryView)
+      Saved songs grid:
+        Search by title/artist
+        Filter: All/High Confidence/Needs Work/
+                No Practice
+        Card expand: notes, transpose, drill,
+                     Open in Play
+      Practice stats:
+        Total songs, total drills,
+        avg confidence %, day streak
+        SVG line chart (30 days)
+      Recent activity feed (last 10 sessions)
+      Achievements (6 badges, progress bars)
+      Single-song drill (all 6 types)
+
   styles/
-    global.css         — app-wide styles, CSS variables,
-                         chord chip quality classes,
-                         section-title, section-label
-  plugins/
-    vuetify.js         — dark gold theme config
-  router/
-    index.js           — 4 routes: / → /explore (redirect),
-                         /explore, /gig, /play, /library
-
-server.js              — Express API server (port 3001)
-  POST /api/explain    — Claude AI proxy (rate: 10/hr)
-  GET  /api/spotify/search      — Spotify search
-  GET  /api/spotify/features/:id — audio features
+    global.css
+      CSS variables, chip quality classes,
+      section-title, section-label,
+      scrollbar styles, micro-interactions
 ```
-
----
 
 ## Theme / Design System
 Dark gold musician aesthetic.
 
-Key colors (defined in `src/plugins/vuetify.js`):
+Colors (src/plugins/vuetify.js):
 ```
 background:   #0D0D0F
 surface:      #1A1A1F
-primary:      #C8A96E  (warm gold — stage lighting)
+primary:      #C8A96E  (warm gold)
 secondary:    #6E8EAD  (steel blue)
-accent:       #E8572A  (ember orange — CTAs)
+accent:       #E8572A  (ember orange)
 onBackground: #E8E8E0  (warm off-white)
 onSurface:    #C4C4BC  (muted text)
 ```
@@ -140,277 +269,299 @@ Fonts:
 - Headings: Space Grotesk 700
 - Body: Inter 400/500
 
-CSS class conventions:
+CSS classes:
 ```
-.section-title    — white, bold, 3px gold left border
-.section-label    — 10px uppercase, muted, bottom rule
-.chip-major       — gold tint chip
-.chip-minor       — blue tint chip
-.chip-dim         — ember tint chip
-.chip-nns-style   — monospace, muted NNS chip
+.section-title  — white, bold, gold left border,
+                  subtle gold pill bg
+.section-label  — 10px uppercase, muted,
+                  bottom rule
+.chip-major     — gold tint
+.chip-minor     — blue tint
+.chip-dim       — ember tint
+.chip-nns-style — monospace, muted
 ```
-
-Chord button unselected state colors:
-```
-Major:      background rgba(200,169,110,0.12), border rgba(200,169,110,0.15)
-Minor:      background rgba(110,142,173,0.12), border rgba(110,142,173,0.15)
-Diminished: background rgba(232,87,42,0.14),   border rgba(232,87,42,0.20)
-```
-
----
 
 ## Supabase Schema
-Tables (all with RLS enabled):
+All tables have RLS enabled (verified).
+
 ```
-profiles          — id, username, created_at
-songs             — id, user_id, title, artist,
-                    key, bpm, chord_chart[],
-                    nns_chart[], sections (jsonb),
-                    form_order[], notes,
-                    spotify_id, album_art, created_at
-setlists          — id, user_id, name,
-                    gig_date, venue, created_at
-setlist_songs     — id, setlist_id, song_id,
-                    position, transpose_to
-practice_sessions — id, user_id, song_id,
-                    drill_type, score,
-                    section_id, created_at
-song_cache        — id, spotify_id, title,
-                    artist, key, bpm, sections (jsonb),
-                    confidence, source,
-                    verified_count, cached_at
-call_log          — id, user_id, function_name,
-                    called_at
+profiles
+  id uuid references auth.users PK
+  username text
+  created_at timestamptz
+
+songs
+  id uuid PK
+  user_id uuid references auth.users
+  title text NOT NULL
+  artist text
+  key text
+  bpm integer
+  chord_chart text[]
+  nns_chart text[]
+  sections jsonb (array of section objects)
+  form_order text[]
+  notes text
+  created_at timestamptz
+
+Section object shape:
+{
+  id: string,
+  name: string (Verse/Chorus/Bridge etc),
+  order: number,
+  chord_chart: string[],
+  nns_chart: string[],
+  notes: string
+}
+
+setlists
+  id uuid PK
+  user_id uuid references auth.users
+  name text NOT NULL
+  gig_date date
+  venue text
+  created_at timestamptz
+
+setlist_songs
+  id uuid PK
+  setlist_id uuid references setlists
+  song_id uuid references songs
+  position integer
+  transpose_to text
+  RLS: subquery checks setlist ownership
+
+practice_sessions
+  id uuid PK
+  user_id uuid references auth.users
+  song_id uuid references songs
+  drill_type text
+  score integer (100/60/0)
+  section_id text
+  created_at timestamptz
 ```
-
-Auth: Supabase email/password + Google OAuth
-(Google OAuth configured in Supabase dashboard)
-
----
-
-## Dev Setup
-```
-npm run dev     — starts Vite (port 8080) + Express (port 3001)
-npm run build   — production build to dist/
-npm run deploy  — build + gcloud app deploy
-```
-
-Vite proxies `/api/*` to Express (configured in `vite.config.js`).
-
----
 
 ## Environment Variables
-Required in `.env` (never commit):
 ```
+# Local .env (never commit):
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
+ANTHROPIC_API_KEY=        # server-side only
 VITE_SPOTIFY_CLIENT_ID=
-
-# Server-side only (server.js):
-ANTHROPIC_API_KEY=
-SPOTIFY_CLIENT_SECRET=
+SPOTIFY_CLIENT_SECRET=    # server-side only
 ```
 
-Security model:
-- `ANTHROPIC_API_KEY` and `SPOTIFY_CLIENT_SECRET` are server-side only
-- `VITE_SUPABASE_*` and `VITE_SPOTIFY_CLIENT_ID` are client-safe by design
-- Husky pre-commit hook blocks accidental API key commits
+App Engine: injected by deploy.sh via awk
+into temporary app.yaml at deploy time.
+Never stored in committed app.yaml.
 
----
+## Server.js API Endpoints
+Express server proxies all secret API calls.
+Runs on same App Engine instance as Vue app.
+
+```
+POST /api/explain
+  Explains a chord progression (Claude AI)
+  Rate limit: 10/hr per IP
+  Model: claude-sonnet-4-6
+
+POST /api/suggest-songs
+  Suggests cover songs for a setlist (Claude AI)
+  Rate limit: 5/hr per IP
+  Model: claude-sonnet-4-6
+  Body: { venueType, crowdVibe, genres,
+          setLength, existingSongs,
+          additionalContext }
+
+POST /api/sound-like
+  Generates progressions from vibe description
+  Rate limit: 10/hr per IP
+  Model: claude-sonnet-4-6
+  Body: { prompt, currentKey }
+  Server simplifies to triads before returning.
+  Client also simplifies on Load actions.
+
+GET /api/spotify/search
+  Searches Spotify for song metadata
+  Returns: title, artist, key, BPM
+
+GET /api/getsongbpm
+  Gets BPM data for a song
+```
+
+Rate limits: in-memory (resets on restart).
+NOTE: move to Redis in Phase 2.
+
+## Deployment
+```
+Platform: GCP App Engine (us-central)
+URL:      https://cadence-491202.uc.r.appspot.com
+Deploy:   npm run deploy (deploy.sh)
+  1. npm run build
+  2. Copies dist + server.js to temp dir
+  3. Injects secrets via awk into app.yaml
+  4. gcloud app deploy
+  5. Cleans up temp dir
+
+app.yaml: nodejs20, standard env
+  max_instances: 2
+  Static file handlers for dist/
+  Security headers (CSP, X-Frame-Options etc)
+```
+
+IMPORTANT: `node server.js` (no --env-file in prod).
+App Engine injects env vars directly.
+Local dev: `node --env-file .env server.js`
 
 ## Key Architectural Decisions
 
-1. **`musicTheory.js` is pure functions** — no Vue deps. Portable to Flutter (Dart port planned).
+1. **musicTheory.js pure functions**
+   No Vue dependencies — portable to Flutter.
+   Dart port planned for Flutter rewrite.
 
-2. **`useAudio.js` is a singleton** — shared across all tabs so instrument/volume settings persist when switching tabs.
+2. **useAudio.js singleton**
+   Shared across all tabs — instrument/volume
+   settings persist during session.
 
-3. **`useRhythm.js` is a singleton** — one set of Tone.js synths shared across renders. All synths lazy-initialized after AudioContext starts.
+3. **useAuth.js singleton**
+   currentUser reactive ref shared globally.
+   No Vuex/Pinia needed.
 
-4. **`useAuth.js` is a singleton** — `currentUser` reactive ref shared globally without Vuex/Pinia.
+4. **keep-alive on all views**
+   All views use `defineOptions({ name: 'XxxView' })`.
+   onActivated alongside onMounted for data refresh.
+   onBeforeRouteLeave closes all open dialogs.
 
-5. **`keep-alive` on all views** — use `onActivated` alongside `onMounted` for data refresh on tab switch. `onMounted` fires only once; `onActivated` fires every time the tab becomes active.
+5. **Cross-tab navigation**
+   Uses window.history.state with _cadenceLoad marker.
+   Play tab reads state on onMounted + onActivated.
+   history.replaceState clears marker after reading.
 
-6. **Cross-tab navigation** uses `window.history.state` with `_cadenceLoad` marker pattern to pass context between tabs.
+6. **ChordVisualizer reads activeInstrument**
+   Shows piano, guitar, or both based on setting.
+   Lefty mode persisted to localStorage.
 
-7. **`ChordVisualizer`** reads `activeInstrument` from `useAudio` — shows piano or guitar fingering accordingly.
+7. **Sound Like feature**
+   Cards show full extended chords (educational).
+   simplifyProgression() only runs on
+   Load to Explore / Load to Play actions.
+   Server also simplifies before returning.
 
-8. **No localStorage for app data** — Supabase is the store. localStorage only for UI preferences.
-
----
-
-## Song Form Data Structure
-
-Simple songs: flat `chord_chart[]` array
-
-Full form songs: `sections` jsonb array
-```json
-[{
-  "id": "string",
-  "name": "Verse|Chorus|Bridge|Intro|Outro|Pre-Chorus|Solo|Tag",
-  "order": 0,
-  "chord_chart": ["G", "Em", "C", "D"],
-  "nns_chart": ["1", "6m", "4", "5"],
-  "notes": "string"
-}]
-```
-Plus `form_order[]` for performance sequence (e.g. Intro → Verse → Chorus → Verse → Chorus → Outro).
-
----
-
-## Drill Types (Gig Tab + Library Tab)
-1. **NNS Flash** — shows NNS, recall chords
-2. **Transpose Drill** — transpose to new key
-3. **Reverse Drill** — identify key from chords
-4. **Form Drill** — recall chords per section
-5. **Section Flash** — identify section from chords
-6. **Transition Drill** — recall what comes next in form
-
-Scoring: Got it = 100, Almost = 60, Missed = 0
-Spaced repetition: Missed songs re-queue first
-
----
+8. **Song form — two modes**
+   Simple: flat chord_chart array.
+   Full Form: sections + form_order.
+   Section cards define chord content once.
+   Form order builder reuses sections freely.
+   form_order = ['Verse','Chorus','Verse','Chorus']
 
 ## Confidence System
 ```
-Green  — last 3 sessions all Got it (score = 100)
-Yellow — mixed recent results
-Red    — last session was Missed (score = 0)
-Grey   — no practice data yet
+Green:  last 3 sessions all Got it (score=100)
+Yellow: mixed recent results
+Red:    last session Missed (score=0)
+Grey:   no practice data
 ```
 
----
+## Common Patterns — Always Follow These
 
-## Audio Engine (useAudio.js)
-Instruments loaded via soundfont-player from MusyngKite CDN:
-- `piano`: acoustic_grand_piano
-- `guitar`: acoustic_guitar_steel
-- `bass`: acoustic_bass (plays root notes when `bassEnabled`)
-
-`ensureContext()` must be called from a user gesture before any playback (browser autoplay policy).
-
----
-
-## Drum Engine (useRhythm.js)
-10 rhythm modes available in Play tab:
-
-**Row 1:** Off | Simple | Click | Acoustic | Rock
-**Row 2:** Hip-Hop | 4 on Floor | Funk | Swing | Bossa
-
-Synths (all lazy-initialized):
-```
-_clickSynth:    MetalSynth 400Hz — woodblock click
-_kickSynth:     MembraneSynth — standard kick
-_808Synth:      MembraneSynth 8 oct pitchDecay 0.18 — Hip-Hop boom
-_snareSynth:    NoiseSynth pink — standard snare
-_hihatSynth:    MetalSynth closed decay 0.06
-_openHatSynth:  MetalSynth open decay 0.4
-_rideSynth:     MetalSynth 600Hz decay 0.28 — Swing jazz ride
-_rimSynth:      NoiseSynth white decay 0.035 — Bossa rim click
-_rockKickSynth: MembraneSynth 6 oct pitchDecay 0.08 — Rock kick
-_rockSnareSynth:NoiseSynth white decay 0.10 — Rock snare crack
-_crashSynth:    MetalSynth 300Hz decay 0.8 — Rock one-shot crash
-```
-
-All routed through `_gainNode → _reverb → destination`.
-
-`Transport.swing = 0.5` for Swing mode (true triplet 2:1 ratio), reset to 0 on `stopDrums()`.
-
-`PATTERNS` object: sub-patterns per rhythmPreset (whole/eighths/triplets/sixteenths) for click/simple/acoustic/hiphop.
-`FIXED_PATTERNS` object: single 16n/8n pattern per mode for fourOnFloor/funk/swing/bossa/rock.
-
----
-
-## Play Tab — Chart Mode
-Chart mode is the measure editor in the Play tab.
-
-Data structure: `chartBars[]` — array of bar objects
-```js
-{
-  beats: 4,          // time signature (3 or 4)
-  slots: [           // one slot per beat
-    { chord: 'G', duration: 1 },   // duration in beats
-    { chord: null, duration: 1 },
-    ...
-  ]
-}
-```
-
-Users can:
-- Add bars, set chords per beat via picker dialog
-- Set time signature (4/4 or 3/4) per bar
-- Remove individual bars
-- Load chart from a saved song
-- Play through chart at set BPM with beat grid display
-
----
-
-## Deployment
-- Platform: GCP App Engine (us-central)
-- URL: https://cadence-491202.uc.r.appspot.com
-- Project ID: cadence-491202
-- Runtime: nodejs20, standard environment
-- Config: `app.yaml`
-- Deploy: `npm run deploy` (build + `gcloud app deploy`)
-
----
+- Vue 3 Composition API only (no Options API)
+- Import supabase from `src/lib/supabase.js`
+- Import useAudio from `composables/useAudio.js`
+- Import useAuth from `composables/useAuth.js`
+- `defineOptions({ name: 'XxxView' })` in all views
+- onActivated + onMounted for data fetching
+- try/catch + dismissable v-alert for all Supabase operations
+- `sanitizeText()` before all Supabase writes
+- Never use localStorage for app data (Supabase is the store)
+- localStorage only for UI preferences:
+  - `cadence_show_fingering`
+  - `cadence_lefty_mode`
+  - `cadence_notation` (sharps/flats)
+  - `cadence_play_mode` (loop/chart)
 
 ## Security
-- DOMPurify applied to all user text before DB writes (`sanitizeText`, `sanitizeChord`)
-- Input validation on all form fields (`validateBPM`, `validateChordChart`)
-- Rate limiting per IP per endpoint (named buckets in server.js)
-- CSP headers in `app.yaml`
-- Husky pre-commit hook blocks API key commits
-- Supabase RLS on all tables
+Score: 8.2/10 (production ready for POC)
+- No secrets in browser bundle
+- All API keys server-side via server.js
+- RLS enabled + verified on all tables
+- Input sanitization (DOMPurify) on all writes
+- CSP headers in app.yaml + vite.config.js
+- Husky pre-commit hook blocks key commits
+- Rate limiting on all AI endpoints
+- Session refresh on visibility change
+- Auth guards on all Supabase writes
 
----
+Remaining gaps (Phase 2):
+- Move to Redis for rate limiting
+- Supabase Edge Functions for API proxy
+- Vite 8 migration (dev-only CVE)
 
 ## What This Is NOT
-- Not a tab/chord lookup app (legal reasons — no copyrighted charts)
+- Not a tab/chord lookup (legal reasons)
 - Not a social network (yet)
-- Not a metronome-only app
-- Not targeted at advanced theory students
+- Not targeted at conservatory students
+- Triads only — no 7ths/extensions (Phase 2)
 
----
+## Phase 2 — Flutter Rewrite
+```
+Repo: github.com/mikedesimone12/cadence
+Same Supabase backend, same schema.
+Vue POC at: cadence-poc-vue (this repo)
+```
 
-## Code Conventions
-- Always use Vue 3 Composition API (no Options API)
-- Always `defineOptions({ name: 'XxxView' })` in view files (required for keep-alive)
-- Always use `onActivated` alongside `onMounted` for data fetching in views
-- Always import `supabase` from `src/lib/supabase.js`
-- Always import `useAudio` from `composables/useAudio.js`
-- Always import `useRhythm` from `composables/useRhythm.js`
-- Always import `useAuth` from `composables/useAuth.js`
-- Always handle Supabase errors with try/catch + dismissable `v-alert`
-- Always call `sanitizeText()` / `sanitizeChord()` before Supabase insert/update
-- Never use localStorage for app data — Supabase is the store
-- localStorage only for UI preferences:
-  `cadence_show_fingering`, `cadence_lefty_mode`, `cadence_notation`
-- CSS changes go in `global.css` or scoped `<style>` blocks
-- Inline styles only when values are dynamic (bound to reactive data)
-- All music theory logic in `src/core/musicTheory.js` — pure functions only, no UI
+Phase 2 feature list:
 
----
+Music Theory:
+- [ ] Extended chords toggle (triads → 7ths)
+      maj7, m7, dom7, dim7 across all tabs
+      Dart music theory core from day one
+- [ ] Chord extensions (9ths, 11ths, 13ths)
+- [ ] Mode explorer (Dorian, Mixolydian etc)
+- [ ] Ear training / chord recognition via mic
 
-## Phase 2 (Flutter Rewrite)
-Same Supabase backend and schema. Vue POC is the reference implementation.
+Gig:
+- [ ] Song import (Spotify + Claude AI)
+- [ ] Chordify API (if approved)
+- [ ] Community shared chord charts
+- [ ] Google OAuth
+- [ ] Export setlist as PDF
+- [ ] Practice plan generator (AI)
+- [ ] Key/tempo transition suggester (AI)
 
-Features planned for Flutter only (not in Vue POC):
-- Extended chords (7ths, maj7, dom7, m7b5)
-- Song import via Spotify + Claude AI chord suggestion
-- Mic-based chord detection
-- App store submission (iOS + Android)
-- API keys moved to Supabase Edge Functions
-- Community shared chord charts
-- Export setlist as PDF
-- Google OAuth (mobile)
-- Circle of fifths interactive diagram
+Play:
+- [ ] Extended chord voicings in visualizer
+- [ ] Real-time chord detection via mic
 
----
+Explore:
+- [ ] Circle of Fifths interactive
+- [ ] Full mode explorer
+- [ ] Per-chord substitution explainer (AI)
 
-## Session History Summary
-Built across ~20 Claude Code sessions:
-scaffold → music theory core → explore tab → supabase setup → auth →
-gig tab → drill mode → audio engine → play tab → library tab →
-cross-tab wiring → QA/debug → song form → visual polish →
-chord visualizer → common progressions → rhythm section →
-mobile fixes → chord grid redesign → measure editor (Chart mode)
+Library:
+- [ ] Gig debrief assistant (AI coaching)
+- [ ] Long term progress trends
+
+Infrastructure:
+- [ ] Firebase Hosting for Flutter Web
+- [ ] App Store + Play Store submission
+- [ ] Anthropic API → Supabase Edge Functions
+- [ ] Redis rate limiting
+- [ ] Google OAuth
+- [ ] Vite 8 migration
+
+## Session History
+Built across ~25 Claude Code sessions:
+scaffold, music theory core, explore tab,
+supabase + auth, gig tab, drill mode,
+audio engine, play tab, library tab,
+cross-tab wiring, QA + debug passes,
+song form with sections, visual polish,
+chord visualizer (piano + guitar SVG),
+common progressions with examples,
+rhythm section (Tone.js patterns),
+mobile fixes (dynamic piano viewport),
+chord grid redesign (circle of fifths),
+measure editor (chord chart mode),
+song form UX overhaul (chord picker),
+security hardening, App Engine deploy,
+AI features (explain, suggest songs,
+sound like with triad simplification).
