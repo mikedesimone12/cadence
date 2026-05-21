@@ -32,10 +32,12 @@ const bassEnabled      = ref(true)
 const isLoaded         = ref(false)
 const volume           = ref(80)
 
-let pianoPlayer  = null
-let guitarPlayer = null
-let bassPlayer   = null
-let loadPromise  = null
+let pianoPlayer      = null
+let guitarPlayer     = null
+let bassPlayer       = null
+let percussionPlayer = null
+let _percGain        = null
+let loadPromise      = null
 
 // ─── Loading ──────────────────────────────────────────────────────────────────
 
@@ -44,15 +46,30 @@ async function loadInstruments() {
   if (loadPromise)    return loadPromise
 
   loadPromise = (async () => {
-    // Tone.getContext() creates the AudioContext (starts suspended — resume happens
-    // on first user gesture via ensureContext())
     const ctx  = Tone.getContext().rawContext
     const opts = { soundfont: 'MusyngKite' }
-    ;[pianoPlayer, guitarPlayer, bassPlayer] = await Promise.all([
+
+    // Percussion gain node — attenuates samples to balance against melodic instruments
+    _percGain = ctx.createGain()
+    _percGain.gain.value = 0.8
+    _percGain.connect(ctx.destination)
+
+    // Percussion loads in parallel but won't block isLoaded on failure
+    const percLoad = Soundfont.instrument(ctx, 'percussion', {
+      ...opts,
+      destination: _percGain,
+    }).catch(err => {
+      console.warn('[Cadence] Percussion soundfont unavailable, using synth fallback:', err.message)
+      return null
+    })
+
+    ;[pianoPlayer, guitarPlayer, bassPlayer, percussionPlayer] = await Promise.all([
       Soundfont.instrument(ctx, 'acoustic_grand_piano',  opts),
       Soundfont.instrument(ctx, 'acoustic_guitar_steel', opts),
       Soundfont.instrument(ctx, 'acoustic_bass',         opts),
+      percLoad,
     ])
+
     isLoaded.value = true
   })()
 
@@ -98,7 +115,6 @@ function playScale(keyRoot, type = 'major') {
     ? [0, 2, 3, 5, 7, 8, 10, 12]
     : [0, 2, 4, 5, 7, 9, 11, 12]
   const g = _gain()
-  // Schedule via WebAudio timeline — no setTimeout drift
   intervals.forEach((interval, i) => {
     player.play(midiToNoteName(root + interval), Tone.now() + i * 0.3, { gain: g, duration: 0.5 })
   })
@@ -116,6 +132,10 @@ function stopAll() {
   guitarPlayer?.stop()
   bassPlayer?.stop()
 }
+
+// ─── Percussion access (consumed by useRhythm.js — no circular dep) ──────────
+
+export function getPercussionPlayer() { return percussionPlayer }
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 

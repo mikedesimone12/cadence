@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node --env-file .env server.js",
+    "start": "node server.js",
     "dev": "concurrently \"vite --port 8080\" \"node --env-file .env server.js\"",
     "dev:vite": "vite --port 8080",
     "dev:server": "node --env-file .env server.js",

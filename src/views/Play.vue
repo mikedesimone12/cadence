@@ -491,40 +491,28 @@
           <span class="rhythm-btn-desc">Chords only</span>
         </div>
       </v-btn>
-      <v-btn value="simple" class="rhythm-btn">
-        <div class="rhythm-btn-inner">
-          <span class="rhythm-btn-label">Simple</span>
-          <span class="rhythm-btn-desc">Basic timekeeping</span>
-        </div>
-      </v-btn>
       <v-btn value="click" class="rhythm-btn">
         <div class="rhythm-btn-inner">
           <span class="rhythm-btn-label">Click</span>
           <span class="rhythm-btn-desc">Straight metronome</span>
         </div>
       </v-btn>
-      <v-btn value="acoustic" class="rhythm-btn">
+      <v-btn value="simple" class="rhythm-btn">
         <div class="rhythm-btn-inner">
-          <span class="rhythm-btn-label">Acoustic</span>
-          <span class="rhythm-btn-desc">Kick, snare, hi-hat</span>
+          <span class="rhythm-btn-label">Simple</span>
+          <span class="rhythm-btn-desc">Basic kick and snare</span>
         </div>
       </v-btn>
-      <v-btn value="rock" class="rhythm-btn">
+      <v-btn value="swing" class="rhythm-btn">
         <div class="rhythm-btn-inner">
-          <span class="rhythm-btn-label">Rock</span>
-          <span class="rhythm-btn-desc">Straight ahead rock</span>
+          <span class="rhythm-btn-label">Swing</span>
+          <span class="rhythm-btn-desc">Jazz swing feel</span>
         </div>
       </v-btn>
-      <v-btn value="hiphop" class="rhythm-btn">
+      <v-btn value="bossa" class="rhythm-btn">
         <div class="rhythm-btn-inner">
-          <span class="rhythm-btn-label">Hip-Hop</span>
-          <span class="rhythm-btn-desc">808, snap, 16ths</span>
-        </div>
-      </v-btn>
-      <v-btn value="fourOnFloor" class="rhythm-btn">
-        <div class="rhythm-btn-inner">
-          <span class="rhythm-btn-label">4 on Floor</span>
-          <span class="rhythm-btn-desc">Kick every beat</span>
+          <span class="rhythm-btn-label">Bossa Nova</span>
+          <span class="rhythm-btn-desc">Brazilian groove</span>
         </div>
       </v-btn>
       <v-btn value="funk" class="rhythm-btn">
@@ -533,34 +521,13 @@
           <span class="rhythm-btn-desc">Syncopated 16ths</span>
         </div>
       </v-btn>
-      <v-btn value="swing" class="rhythm-btn">
+      <v-btn value="hiphop" class="rhythm-btn">
         <div class="rhythm-btn-inner">
-          <span class="rhythm-btn-label">Swing</span>
-          <span class="rhythm-btn-desc">Triplet shuffle</span>
-        </div>
-      </v-btn>
-      <v-btn value="bossa" class="rhythm-btn">
-        <div class="rhythm-btn-inner">
-          <span class="rhythm-btn-label">Bossa</span>
-          <span class="rhythm-btn-desc">Brazilian groove</span>
+          <span class="rhythm-btn-label">Hip-Hop</span>
+          <span class="rhythm-btn-desc">808, snap, 16ths</span>
         </div>
       </v-btn>
     </v-btn-toggle>
-
-    <!-- Swing slider (hip-hop only) -->
-    <v-expand-transition>
-      <div v-if="rhythmMode === 'hiphop'" class="d-flex align-center mb-3" style="gap: 8px">
-        <span class="text-caption text-medium-emphasis" style="min-width:44px">Swing</span>
-        <v-slider
-          :model-value="swingAmount" min="0" max="30" step="1"
-          color="secondary" hide-details style="flex:1"
-          @update:model-value="setSwingAmount"
-        />
-        <span class="text-caption" style="min-width:32px; color:#C8A96E; text-align:right">
-          {{ swingAmount }}%
-        </span>
-      </div>
-    </v-expand-transition>
 
     <!-- Loop mode playback display -->
     <v-expand-transition>
@@ -959,9 +926,9 @@ const {
 } = useAudio()
 
 const {
-  rhythmMode, rhythmVolume, swingAmount,
+  rhythmMode, rhythmVolume,
   drumsReady, drumTick, initDrums,
-  setRhythmVolume, setSwingAmount,
+  setRhythmVolume,
 } = useDrums()
 
 onMounted(() => {
@@ -1497,7 +1464,7 @@ async function startPlayback() {
   transport.cancel()
 
   if (mode === 'swing') {
-    transport.swing = 0.5
+    transport.swing = 0.25
     transport.swingSubdivision = '8n'
   } else {
     transport.swing = 0
@@ -1627,12 +1594,11 @@ function handleRhythmModeChange(mode) {
   if (isPlaying.value) {
     const transport = Tone.getTransport()
     if (mode === 'swing') {
-      transport.swing = 0.5
+      transport.swing = 0.25
       transport.swingSubdivision = '8n'
     } else {
       transport.swing = 0
     }
-    // drumTick reads rhythmMode.value reactively — pattern change is instant
   }
 }
 
@@ -1895,16 +1861,14 @@ onBeforeRouteLeave(() => {
 }
 .rhythm-btn {
   flex: 1 1 0 !important;
-  min-width: calc(20% - 3px) !important;
-  max-width: 20% !important;
+  min-width: 80px !important;
   height: auto !important;
-  padding: 7px 3px !important;
+  padding: 7px 4px !important;
   text-transform: none !important;
 }
 @media (max-width: 599px) {
   .rhythm-btn {
-    min-width: calc(50% - 3px) !important;
-    max-width: 50% !important;
+    flex: 1 1 calc(25% - 4px) !important;
   }
 }
 .rhythm-btn-inner {
